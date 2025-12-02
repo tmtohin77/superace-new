@@ -65,8 +65,11 @@ class PreloadScene extends Phaser.Scene {
         this.load.image('jack', 'jack.png');
         this.load.image('spade', 'spade.png');
         this.load.image('coin', 'coin.png'); 
+        
+        // 🔥 Ensure these exist in assets folder
         this.load.image('sound_on', 'sound_on.png');
         this.load.image('sound_off', 'sound_off.png'); 
+        
         this.load.audio('spin_start', 'spin_start.mp3');
         this.load.audio('reel_stop', 'reel_stop.mp3');
         this.load.audio('win_sound', 'win_sound.mp3');
@@ -182,16 +185,19 @@ class GameScene extends Phaser.Scene {
         // 1. Background (Depth 0)
         this.add.image(width/2, height/2, 'background').setDisplaySize(width, height).setDepth(0);
 
-        // 🔥 Fix 1: Coin Particles (Depth 1 - Behind Frames/Buttons, Above Background)
         this.coinParticles = this.add.particles('coin');
         this.coinParticles.setDepth(1); 
 
-        // 2. Grid & Frames (Depth 2-5)
         const maskShape = this.make.graphics().fillStyle(0xffffff).fillRect(START_X-LAYOUT.REEL_WIDTH/2-5, LAYOUT.START_Y-LAYOUT.SYMBOL_HEIGHT/2-5, TOTAL_GRID_WIDTH+10, (LAYOUT.SYMBOL_HEIGHT*ROW_COUNT)+(LAYOUT.GAP*ROW_COUNT)+20);
         const gridMask = maskShape.createGeometryMask();
         
+        // 🔥 Fix 3: Layering
+        // Golden Frame (Cell BG) = Depth 2
+        // Symbols = Depth 3
+        // Reel Frame (Main Grid) = Depth 4
+        
         const frameCenterY = LAYOUT.START_Y + ((ROW_COUNT-1)*(LAYOUT.SYMBOL_HEIGHT+LAYOUT.GAP))/2;
-        this.add.image(width/2, frameCenterY, 'reel_frame_img').setDisplaySize(TOTAL_GRID_WIDTH+30, (LAYOUT.SYMBOL_HEIGHT*ROW_COUNT)+40).setDepth(5); 
+        this.add.image(width/2, frameCenterY, 'reel_frame_img').setDisplaySize(TOTAL_GRID_WIDTH+30, (LAYOUT.SYMBOL_HEIGHT*ROW_COUNT)+40).setDepth(4); 
         
         this.symbols = [];
         for (let reel=0; reel<REEL_COUNT; reel++) {
@@ -199,27 +205,33 @@ class GameScene extends Phaser.Scene {
             for (let row=0; row<ROW_COUNT; row++) {
                 const x = START_X + reel*(LAYOUT.REEL_WIDTH+LAYOUT.GAP); 
                 const y = LAYOUT.START_Y + row*(LAYOUT.SYMBOL_HEIGHT+LAYOUT.GAP); 
-                this.add.image(x, y, 'golden_frame').setDisplaySize(LAYOUT.REEL_WIDTH, LAYOUT.SYMBOL_HEIGHT).setDepth(6); 
-                const s = this.add.image(x, y, Phaser.Utils.Array.GetRandom(SYMBOL_KEYS)).setDisplaySize(LAYOUT.REEL_WIDTH-15, LAYOUT.SYMBOL_HEIGHT-15).setDepth(4).setMask(gridMask); // Symbols behind frame
+                
+                // Individual Golden Frame (Depth 2)
+                this.add.image(x, y, 'golden_frame').setDisplaySize(LAYOUT.REEL_WIDTH, LAYOUT.SYMBOL_HEIGHT).setDepth(2); 
+                
+                // Symbol (Depth 3)
+                const s = this.add.image(x, y, Phaser.Utils.Array.GetRandom(SYMBOL_KEYS)).setDisplaySize(LAYOUT.REEL_WIDTH-15, LAYOUT.SYMBOL_HEIGHT-15).setDepth(3).setMask(gridMask);
+                
                 s.originalX = x; s.originalY = y; s.rowIndex = row; 
                 this.symbols[reel][row] = s;
             }
         }
 
-        // 3. UI Layer (Depth 50+)
         this.add.text(width/2, 80, 'SuperAce', { font: 'bold 48px Arial', fill: '#FFD700', stroke: '#000', strokeThickness: 4 }).setOrigin(0.5).setDepth(50); 
         this.noticeLabel = this.add.text(width, 140, "Welcome!", { font: '20px Arial', fill: '#0F0', backgroundColor: '#000' }).setOrigin(0, 0.5).setDepth(50);
         this.tweens.add({ targets: this.noticeLabel, x: -600, duration: 12000, repeat: -1 });
         
         this.fetchSettings();
 
-        // Sound
+        // Sound Button
         this.soundBtn = this.add.image(width-40, 80, 'sound_on').setDisplaySize(50, 50).setInteractive({useHandCursor:true}).setDepth(50);
         this.soundWaves = this.add.text(width-70, 80, ')))', {fontSize: '20px', fill: '#0F0'}).setOrigin(1, 0.5).setDepth(50);
         
+        // 🔥 Fix 2: Sound Toggle Check
         this.soundBtn.on('pointerdown', () => { 
             this.soundEnabled = !this.soundEnabled; 
             this.sound.mute = !this.soundEnabled; 
+            // Make sure 'sound_off.png' exists in assets!
             this.soundBtn.setTexture(this.soundEnabled ? 'sound_on' : 'sound_off'); 
             this.soundWaves.setVisible(this.soundEnabled);
         });
@@ -240,7 +252,6 @@ class GameScene extends Phaser.Scene {
         this.spinButton.on('pointerdown', this.startSpin, this);
         this.add.text(width/2, uiY, 'SPIN', { font: 'bold 18px Arial', fill: '#FFD700' }).setOrigin(0.5).setDepth(53);
 
-        // 🔥 Fix 2: Bigger Plus/Minus Buttons (Scale 0.35)
         this.add.image(width-80, uiY-60, 'plus_button').setScale(0.35).setInteractive().setDepth(52).on('pointerdown', () => this.adjustBet(1));
         this.add.image(width-80, uiY+60, 'minus_button').setScale(0.35).setInteractive().setDepth(52).on('pointerdown', () => this.adjustBet(-1));
         
@@ -393,7 +404,6 @@ class GameScene extends Phaser.Scene {
             y: -50,
             lifespan: 1500, 
             speedY: { min: 300, max: 600 },
-            // 🔥 Fix 3: Tiny Coin Size (like spin button or smaller)
             scale: { start: 0.08, end: 0.08 },
             quantity: 1, 
             frequency: 100,
@@ -461,19 +471,24 @@ class GameScene extends Phaser.Scene {
         return c;
     }
 
+    // --- DEPOSIT SYSTEM FIX 1: Layout Fix ---
     showDepositPanel() {
         const { width, height } = this.scale;
         const c = this.add.container(width/2, height/2).setDepth(300);
         c.add(this.add.rectangle(0,0,width,height,0x000000,0.8));
-        c.add(this.add.rectangle(0,0,480,500,0xFFFFFF).setStrokeStyle(4, 0x00FF00));
-        c.add(this.add.text(0,-200,"DEPOSIT", {fontSize:'32px', fill:'#000', fontStyle:'bold'}).setOrigin(0.5));
+        
+        // Increased height to 550 to fit buttons
+        c.add(this.add.rectangle(0,0,480,550,0xFFFFFF).setStrokeStyle(4, 0x00FF00));
+        c.add(this.add.text(0,-230,"DEPOSIT", {fontSize:'32px', fill:'#000', fontStyle:'bold'}).setOrigin(0.5));
 
-        const amtInput = this.createInputBox(0, -100, "Enter Amount (min 50)", c);
-        const phnInput = this.createInputBox(0, -20, "Sender Number", c);
+        const amtInput = this.createInputBox(0, -130, "Enter Amount (min 50)", c);
+        const phnInput = this.createInputBox(0, -60, "Sender Number", c);
 
-        const b1 = this.add.text(0, 80, " bKash Payment ", {fontSize:'24px', backgroundColor:'#E2136E', padding:10}).setOrigin(0.5).setInteractive({useHandCursor:true});
-        const b2 = this.add.text(0, 150, " Nagad Payment ", {fontSize:'24px', backgroundColor:'#F58220', padding:10}).setOrigin(0.5).setInteractive({useHandCursor:true});
-        const hBtn = this.add.text(0, 220, " [ VIEW HISTORY ] ", {fontSize:'20px', backgroundColor:'#00AAFF', padding:5}).setOrigin(0.5).setInteractive({useHandCursor:true});
+        const b1 = this.add.text(0, 30, " bKash Payment ", {fontSize:'24px', backgroundColor:'#E2136E', padding:10}).setOrigin(0.5).setInteractive({useHandCursor:true});
+        const b2 = this.add.text(0, 100, " Nagad Payment ", {fontSize:'24px', backgroundColor:'#F58220', padding:10}).setOrigin(0.5).setInteractive({useHandCursor:true});
+        
+        // Moved History button slightly up
+        const hBtn = this.add.text(0, 170, " [ VIEW HISTORY ] ", {fontSize:'20px', backgroundColor:'#00AAFF', padding:5}).setOrigin(0.5).setInteractive({useHandCursor:true});
         hBtn.on('pointerdown', ()=> { c.destroy(); this.showTransactionHistory('Deposit'); });
 
         const validate = (method, color) => {
@@ -488,7 +503,9 @@ class GameScene extends Phaser.Scene {
         b2.on('pointerdown', () => validate('Nagad', 0xF58220));
 
         c.add([b1, b2, hBtn]);
-        this.addCloseButton(c, ()=>c.destroy(), 260);
+        
+        // 🔥 Moved Close button UP to stay inside the box
+        this.addCloseButton(c, ()=>c.destroy(), 230);
     }
 
     createInputBox(x, y, placeholder, parent, uppercase = false) {
@@ -546,7 +563,7 @@ class GameScene extends Phaser.Scene {
         this.addCloseButton(c, ()=>c.destroy(), 250);
     }
 
-    // --- ADMIN PANEL UPDATE: "GAME EDIT" ---
+    // --- ADMIN PANEL ---
     showAdminDashboard() {
         const { width, height } = this.scale;
         const c = this.add.container(width/2, height/2).setDepth(2000); 
@@ -559,13 +576,11 @@ class GameScene extends Phaser.Scene {
             {t:'USER MANAGEMENT', cb:()=>this.showUserListPanel()},
             {t:'DEPOSIT REQS', cb:()=>this.showAdminRequestsPanel('Deposit')},
             {t:'WITHDRAW REQS', cb:()=>this.showAdminRequestsPanel('Withdraw')},
-            // 🔥 Fix 4: Combined GAME EDIT button
             {t:'GAME EDIT', cb:()=>this.showGameEditPanel()} 
         ];
         tools.forEach(t => { c.add(this.createGlossyBtn(0, y, t.t, 0xFFFFFF, t.cb)); y+=80; });
     }
 
-    // 🔥 New Game Edit Panel
     showGameEditPanel() {
         const { width, height } = this.scale;
         const c = this.add.container(width/2, height/2).setDepth(2100);
@@ -573,7 +588,6 @@ class GameScene extends Phaser.Scene {
         c.add(this.add.text(0, -250, "GAME SETTINGS", { fontSize: '28px', fill: '#FFD700' }).setOrigin(0.5));
         this.addCloseButton(c, ()=>c.destroy(), 250);
 
-        // Win Rate Controls
         let y = -150;
         const rateTxt = this.add.text(0, y, `WIN RATE: ${this.currentWinRate}%`, {fontSize:'24px', fill:'#0F0'}).setOrigin(0.5);
         const btnMinus = this.add.text(-120, y, " [-] ", {fontSize:'24px', backgroundColor:'#F00'}).setOrigin(0.5).setInteractive({useHandCursor:true});
@@ -589,7 +603,6 @@ class GameScene extends Phaser.Scene {
         btnPlus.on('pointerdown', () => updateRate(10));
         c.add([rateTxt, btnMinus, btnPlus]);
 
-        // Notice Update
         y += 100;
         const noticeBtn = this.add.text(0, y, " UPDATE NOTICE ", {fontSize:'22px', backgroundColor:'#333', padding:10}).setOrigin(0.5).setInteractive({useHandCursor:true});
         noticeBtn.on('pointerdown', () => {
