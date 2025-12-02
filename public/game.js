@@ -24,7 +24,7 @@ const MULTIPLIER_LEVELS = [1, 2, 3, 5];
 
 const PAYMENT_NUMBERS = {
     bkash: ["01700000001", "01700000002", "01700000003", "01700000004", "01700000005"],
-    nagad: ["01900000001", "01900000002", "01900000003", "01900000004", "01900000005"]
+    nagad: ["01900000006", "01900000007", "01900000008", "01900000009", "01900000010"]
 };
 
 // =======================================================
@@ -185,7 +185,7 @@ class GameScene extends Phaser.Scene {
         this.add.image(width/2, height/2, 'background').setDisplaySize(width, height);
 
         this.coinParticles = this.add.particles('coin');
-        this.coinParticles.setDepth(2000); 
+        this.coinParticles.setDepth(200); 
 
         const maskShape = this.make.graphics().fillStyle(0xffffff).fillRect(START_X-LAYOUT.REEL_WIDTH/2-5, LAYOUT.START_Y-LAYOUT.SYMBOL_HEIGHT/2-5, TOTAL_GRID_WIDTH+10, (LAYOUT.SYMBOL_HEIGHT*ROW_COUNT)+(LAYOUT.GAP*ROW_COUNT)+20);
         const gridMask = maskShape.createGeometryMask();
@@ -391,8 +391,8 @@ class GameScene extends Phaser.Scene {
             lifespan: 1500, 
             speedY: { min: 300, max: 600 },
             scale: { start: 0.2, end: 0.2 },
-            quantity: 1, 
-            frequency: 100,
+            quantity: 3, 
+            frequency: 80,
             rotate: { min: 0, max: 360 }
         });
         this.time.delayedCall(2000, () => emitter.stop());
