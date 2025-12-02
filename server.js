@@ -14,12 +14,9 @@ const MONGO_URI = "mongodb+srv://tmtohin177:superace123@cluster0.nsyah8t.mongodb
 app.use(cors());
 app.use(bodyParser.json());
 
-// ==============================================
-// 🔥 পাথ ফিক্স (Path Fix)
-// ==============================================
+// পাথ ফিক্স
 app.use(express.static(path.join(__dirname, 'public')));
 app.use('/assets', express.static(path.join(__dirname, 'public', 'assets')));
-// ==============================================
 
 mongoose.connect(MONGO_URI)
     .then(() => console.log("✅ MongoDB Connected"))
@@ -47,9 +44,11 @@ const TransactionSchema = new mongoose.Schema({
 });
 const Transaction = mongoose.model('Transaction', TransactionSchema);
 
+// 🔥 Settings Schema Updated for Win Rate
 const SettingsSchema = new mongoose.Schema({
     id: { type: String, default: 'global' },
-    notice: { type: String, default: 'Welcome to SuperAce! Good Luck!' }
+    notice: { type: String, default: 'Welcome to SuperAce! Good Luck!' },
+    winRate: { type: Number, default: 30 } // Default Win Rate 30%
 });
 const Settings = mongoose.model('Settings', SettingsSchema);
 
@@ -63,13 +62,28 @@ async function initAdmin() {
         console.log("🔥 Admin Account Ready!");
     }
     const setExists = await Settings.findOne({ id: 'global' });
-    if (!setExists) await new Settings({ id: 'global' }).save();
+    if (!setExists) await new Settings({ id: 'global', winRate: 30 }).save();
 }
 initAdmin();
 
 // --- ROUTES ---
 app.get('/api/settings', async (req, res) => {
-    try { const s = await Settings.findOne({ id: 'global' }); res.json(s); } catch { res.json({ notice: '' }); }
+    try { 
+        const s = await Settings.findOne({ id: 'global' }); 
+        res.json(s); 
+    } catch { res.json({ notice: '', winRate: 30 }); }
+});
+
+// 🔥 Update Win Rate API
+app.post('/api/admin/update-winrate', async (req, res) => {
+    const { winRate } = req.body;
+    await Settings.updateOne({ id: 'global' }, { winRate: parseInt(winRate) });
+    res.json({ success: true, message: "Win Rate Updated" });
+});
+
+app.post('/api/admin/update-notice', async (req, res) => { 
+    await Settings.updateOne({ id: 'global' }, { notice: req.body.notice }); 
+    res.json({ success: true }); 
 });
 
 app.post('/api/login', async (req, res) => {
@@ -198,7 +212,6 @@ app.get('/api/admin/transactions', async (req, res) => { try { const t = await T
 app.get('/api/admin/users', async (req, res) => { try { const u = await User.find({}, 'username mobile balance isBanned ownReferralCode').sort({ _id: -1 }); res.json(u); } catch { res.json([]); } });
 app.post('/api/admin/ban-user', async (req, res) => { try { await User.updateOne({ username: req.body.username }, { isBanned: req.body.banStatus }); res.json({ success: true }); } catch { res.json({ success: false }); } });
 app.get('/api/history', async (req, res) => { try { const h = await Transaction.find({ username: req.query.username }).sort({ date: -1 }).limit(20); res.json(h); } catch { res.json([]); } });
-app.post('/api/admin/update-notice', async (req, res) => { await Settings.updateOne({ id: 'global' }, { notice: req.body.notice }); res.json({ success: true }); });
 
 app.get('/', (req, res) => { res.sendFile(path.join(__dirname, 'public', 'index.html')); });
 app.listen(PORT, () => { console.log(`Server running at http://localhost:${PORT}`); });
