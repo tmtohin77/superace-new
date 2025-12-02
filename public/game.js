@@ -1,5 +1,5 @@
 // ===================================
-// ১. কনফিগারেশন (Tight Grid)
+// ১. কনফিগারেশন (Tight Grid & Fixed UI)
 // ===================================
 const LAYOUT = {
     REEL_WIDTH: 105,
@@ -56,8 +56,11 @@ class PreloadScene extends Phaser.Scene {
         this.load.image('reel_frame_img', 'reel_frame.png'); 
         this.load.image('golden_frame', 'golden_frame.png'); 
         this.load.image('bet_button', 'bet_button.png');
-        this.load.image('plus_button', 'plus_button.jpg'); 
-        this.load.image('minus_button', 'minus_button.jpg'); 
+        
+        // 🔥 Fix 1: Buttons loaded as PNG (Ensure files are .png in folder)
+        this.load.image('plus_button', 'plus_button.png'); 
+        this.load.image('minus_button', 'minus_button.png'); 
+        
         this.load.image('golden_burger', 'golden_burger.png');
         this.load.image('ace', 'ace.png');
         this.load.image('king', 'king.png');
@@ -181,7 +184,6 @@ class GameScene extends Phaser.Scene {
         
         this.add.image(width/2, height/2, 'background').setDisplaySize(width, height);
 
-        // 🔥 Fix 2: Coin Emitter on TOP (Layer 2000)
         this.coinParticles = this.add.particles('coin');
         this.coinParticles.setDepth(2000); 
 
@@ -210,7 +212,7 @@ class GameScene extends Phaser.Scene {
         
         this.fetchSettings();
 
-        // Sound )))
+        // Sound Animation
         this.soundBtn = this.add.image(width-40, 80, 'sound_on').setDisplaySize(50, 50).setInteractive({useHandCursor:true});
         this.soundWaves = this.add.text(width-70, 80, ')))', {fontSize: '20px', fill: '#0F0'}).setOrigin(1, 0.5);
         
@@ -371,7 +373,6 @@ class GameScene extends Phaser.Scene {
                 try { this.sound.play('win_sound'); } catch(e){}
                 this.showWinAnimation(win);
                 
-                // 🔥 Fix 3: Coin Rain (Only for Big Win: >5x Bet)
                 if(win > this.currentBet * 5) this.startCoinRain();
                 
                 fetch('/api/update-balance', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({username:this.currentUser.username, amount: win}) })
@@ -387,10 +388,10 @@ class GameScene extends Phaser.Scene {
         const emitter = this.coinParticles.createEmitter({
             x: { min: 0, max: GAME_WIDTH },
             y: -50,
-            lifespan: 1500, // Short lifespan
+            lifespan: 1500, 
             speedY: { min: 300, max: 600 },
-            scale: { start: 0.2, end: 0.2 }, // Small coins
-            quantity: 1, // Sparse rain
+            scale: { start: 0.2, end: 0.2 },
+            quantity: 1, 
             frequency: 100,
             rotate: { min: 0, max: 360 }
         });
@@ -450,7 +451,6 @@ class GameScene extends Phaser.Scene {
         const c = this.add.container(x, y, [bg, txt]);
         bg.on('pointerdown', () => { 
             this.tweens.add({targets:c, scale:0.9, yoyo:true, duration:50}); 
-            // 🔥 Fix 2: Auto Close Menu
             this.toggleMenu(); 
             this.time.delayedCall(200, cb); 
         });
@@ -471,10 +471,13 @@ class GameScene extends Phaser.Scene {
         const b2 = this.add.text(0, 150, " Nagad Payment ", {fontSize:'24px', backgroundColor:'#F58220', padding:10}).setOrigin(0.5).setInteractive({useHandCursor:true});
 
         const validate = (method, color) => {
-            if(!amtInput.value || !phnInput.value) return alert("Fill all fields!");
-            if(phnInput.value.length !== 11) return alert("Sender Number must be 11 digits!");
+            const amount = parseFloat(amtInput.value);
+            // 🔥 Fix 2: Deposit Range Validation
+            if (isNaN(amount) || amount < 50 || amount > 5000) return alert("Amount must be between 50 and 5000 Tk!");
+            if (!phnInput.value || phnInput.value.length !== 11) return alert("Sender Number must be 11 digits!");
+            
             c.destroy();
-            this.showPaymentPage(amtInput.value, method, phnInput.value, color);
+            this.showPaymentPage(amount, method, phnInput.value, color);
         };
 
         b1.on('pointerdown', () => validate('bKash', 0xE2136E));
@@ -484,13 +487,18 @@ class GameScene extends Phaser.Scene {
         this.addCloseButton(c, ()=>c.destroy(), 220);
     }
 
-    createInputBox(x, y, placeholder, parent) {
+    createInputBox(x, y, placeholder, parent, uppercase = false) {
         const bg = this.add.rectangle(x, y, 300, 50, 0xEEEEEE).setStrokeStyle(1, 0x000).setInteractive({useHandCursor:true});
         const txt = this.add.text(x-140, y, placeholder, {fontSize:'18px', fill:'#555'}).setOrigin(0, 0.5);
         const obj = { value: '' };
         bg.on('pointerdown', () => {
-            const v = prompt(placeholder);
-            if(v) { obj.value = v; txt.setText(v).setFill('#000'); }
+            let v = prompt(placeholder);
+            if(v) { 
+                // 🔥 Fix 3: Auto Uppercase for TrxID
+                if(uppercase) v = v.toUpperCase();
+                obj.value = v; 
+                txt.setText(v).setFill('#000'); 
+            }
         });
         parent.add([bg, txt]);
         return obj;
@@ -518,18 +526,17 @@ class GameScene extends Phaser.Scene {
             alert("Number Copied!");
         });
 
-        const trxInput = this.createInputBox(0, 50, "Enter TrxID", c);
+        // 🔥 Fix 3: TrxID Box with Uppercase flag
+        const trxInput = this.createInputBox(0, 50, "Enter TrxID", c, true);
         
         const subBtn = this.add.text(0, 150, " SUBMIT REQUEST ", {fontSize:'26px', backgroundColor:'#00AA00', padding:10}).setOrigin(0.5).setInteractive({useHandCursor:true});
         subBtn.on('pointerdown', () => {
             if(!trxInput.value) return alert("Please Enter TrxID!");
-            let finalTrx = trxInput.value.toUpperCase();
-            if(!/^[A-Z0-9]+$/.test(finalTrx)) return alert("Invalid TrxID! Use Letters and Numbers.");
             
             fetch('/api/transaction', { 
                 method:'POST', 
                 headers:{'Content-Type':'application/json'}, 
-                body:JSON.stringify({ type:'Deposit', method, amount: parseFloat(amount), phone: sender, trx: finalTrx, username:this.currentUser.username }) 
+                body:JSON.stringify({ type:'Deposit', method, amount: parseFloat(amount), phone: sender, trx: trxInput.value, username:this.currentUser.username }) 
             })
             .then(r=>r.json()).then(d=>{ alert(d.message); c.destroy(); });
         });
@@ -538,10 +545,10 @@ class GameScene extends Phaser.Scene {
         this.addCloseButton(c, ()=>c.destroy(), 250);
     }
 
-    // --- ADMIN PANEL FIX (High Z-Index) ---
+    // --- ADMIN PANEL FIX ---
     showAdminDashboard() {
         const { width, height } = this.scale;
-        const c = this.add.container(width/2, height/2).setDepth(2000); // 🔥 Fix: Higher than Menu
+        const c = this.add.container(width/2, height/2).setDepth(2000); 
         c.add(this.add.rectangle(0, 0, 500, 800, 0x111111).setStrokeStyle(3, 0xFFD700));
         c.add(this.add.text(0, -360, "ADMIN CONTROL", { fontSize: '32px', fill: '#FFD700' }).setOrigin(0.5));
         
