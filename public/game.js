@@ -1,10 +1,10 @@
 // ===================================
-// ১. কনফিগারেশন (LAYOUT UPDATE: Tight Grid)
+// ১. কনফিগারেশন (Tight Grid)
 // ===================================
 const LAYOUT = {
     REEL_WIDTH: 105,
-    SYMBOL_HEIGHT: 130, // Reduced height for tight fit
-    GAP: 2, // Very small gap
+    SYMBOL_HEIGHT: 130, 
+    GAP: 2, 
     START_Y: 345,
     BTN_W: 240,
     BTN_H: 60
@@ -22,7 +22,6 @@ const SYMBOL_KEYS = ['golden_burger', 'ace', 'king', 'queen', 'jack', 'spade'];
 const SYMBOL_VALUES = { 'golden_burger': 50, 'ace': 20, 'king': 15, 'queen': 10, 'jack': 8, 'spade': 5 };
 const MULTIPLIER_LEVELS = [1, 2, 3, 5]; 
 
-// Payment Numbers (Auto Rotate logic handled in deposit panel)
 const PAYMENT_NUMBERS = {
     bkash: ["01700000001", "01700000002", "01700000003", "01700000004", "01700000005"],
     nagad: ["01900000001", "01900000002", "01900000003", "01900000004", "01900000005"]
@@ -75,7 +74,7 @@ class PreloadScene extends Phaser.Scene {
 }
 
 // =======================================================
-// Scene 1: Login (Same as before)
+// Scene 1: Login
 // =======================================================
 class LoginScene extends Phaser.Scene {
     constructor() { super('LoginScene'); this.username = ''; this.password = ''; this.mobile = ''; this.newUsername = ''; this.newPassword = ''; this.refCode = ''; }
@@ -156,7 +155,7 @@ class LoginScene extends Phaser.Scene {
 }
 
 // =======================================================
-// Scene 2: Main Game (Logic Updated)
+// Scene 2: Main Game
 // =======================================================
 class GameScene extends Phaser.Scene {
     constructor() {
@@ -164,8 +163,8 @@ class GameScene extends Phaser.Scene {
         this.currentUser = null;
         this.soundEnabled = true;
         this.currentWinRate = 30;
-        this.winStreak = 0; // 🔥 Track consecutive wins
-        this.superWinSpinsLeft = 0; // 🔥 For Super Win Mode
+        this.winStreak = 0; 
+        this.superWinSpinsLeft = 0; 
     }
     
     init(data) {
@@ -182,9 +181,9 @@ class GameScene extends Phaser.Scene {
         
         this.add.image(width/2, height/2, 'background').setDisplaySize(width, height);
 
-        // Coin Emitter (Top Layer Fix)
+        // 🔥 Fix 2: Coin Emitter on TOP (Layer 2000)
         this.coinParticles = this.add.particles('coin');
-        this.coinParticles.setDepth(2000); // 🔥 Ensure it's on top of EVERYTHING
+        this.coinParticles.setDepth(2000); 
 
         const maskShape = this.make.graphics().fillStyle(0xffffff).fillRect(START_X-LAYOUT.REEL_WIDTH/2-5, LAYOUT.START_Y-LAYOUT.SYMBOL_HEIGHT/2-5, TOTAL_GRID_WIDTH+10, (LAYOUT.SYMBOL_HEIGHT*ROW_COUNT)+(LAYOUT.GAP*ROW_COUNT)+20);
         const gridMask = maskShape.createGeometryMask();
@@ -211,7 +210,7 @@ class GameScene extends Phaser.Scene {
         
         this.fetchSettings();
 
-        // Sound Animation )))
+        // Sound )))
         this.soundBtn = this.add.image(width-40, 80, 'sound_on').setDisplaySize(50, 50).setInteractive({useHandCursor:true});
         this.soundWaves = this.add.text(width-70, 80, ')))', {fontSize: '20px', fill: '#0F0'}).setOrigin(1, 0.5);
         
@@ -222,7 +221,6 @@ class GameScene extends Phaser.Scene {
             this.soundWaves.setVisible(this.soundEnabled);
         });
 
-        // 🔥 Multiplier BG & Text Logic
         const multBG = this.add.graphics();
         multBG.fillStyle(0x000000, 0.6); 
         multBG.fillRect(width/2 - 150, 160, 300, 40);
@@ -231,7 +229,7 @@ class GameScene extends Phaser.Scene {
             const t = this.add.text((width/2-120)+i*80, 180, `x${l}`, { font: 'bold 28px Arial', fill: '#555' }).setOrigin(0.5);
             this.multTexts.push(t);
         });
-        this.updateMultiplierUI(); // Initial state
+        this.updateMultiplierUI();
 
         const uiY = height - 100; 
         this.spinButton = this.add.image(width/2, uiY, 'bet_button').setScale(0.08).setInteractive().setDepth(50);
@@ -265,21 +263,20 @@ class GameScene extends Phaser.Scene {
         fetch(`/api/user-data?username=${this.currentUser.username}`).then(r=>r.json()).then(d=>{ 
             if(d.success) { 
                 this.balance = d.balance; 
-                this.currentUser.myCode = d.myCode; // 🔥 Fix Ref Code Undefined
+                this.currentUser.myCode = d.myCode; 
                 this.updateUI(); 
                 if(d.isBanned) location.reload(); 
             } 
         }); 
     }
 
-    // 🔥 Fix: Multiplier Visual
     updateMultiplierUI() {
         this.multTexts.forEach((t, i) => {
             if (i < this.winStreak) {
-                t.setFill('#FFD700'); // Highlight Gold
+                t.setFill('#FFD700'); 
                 t.setFontSize(34);
             } else {
-                t.setFill('#555'); // Dim
+                t.setFill('#555'); 
                 t.setFontSize(28);
             }
         });
@@ -287,8 +284,6 @@ class GameScene extends Phaser.Scene {
 
     getSpinResult() {
         const grid = Array.from({length:REEL_COUNT},()=>[]);
-        
-        // 🔥 Super Win Mode Logic (10 spins with 40% win rate)
         let effectiveWinRate = this.currentWinRate;
         if (this.superWinSpinsLeft > 0) {
             effectiveWinRate = 40;
@@ -338,7 +333,6 @@ class GameScene extends Phaser.Scene {
                             targets: s, y: s.y - SYMBOL_SHIFT_COUNT*(LAYOUT.SYMBOL_HEIGHT+LAYOUT.GAP), duration: SPIN_DURATION_PER_REEL*(reel*1.5+4), ease: 'Quad.easeOut',
                             onUpdate: (t, tg) => { 
                                 if(Math.random()>0.5) tg.setTexture(Phaser.Utils.Array.GetRandom(SYMBOL_KEYS)); 
-                                // 🔥 Tight Frame Size Fix
                                 tg.setDisplaySize(LAYOUT.REEL_WIDTH-15, LAYOUT.SYMBOL_HEIGHT-15);
                             },
                             onComplete: (t, tg) => {
@@ -367,21 +361,22 @@ class GameScene extends Phaser.Scene {
             const win = this.checkWin(grid);
             
             if (win > 0) {
-                // 🔥 Win Logic Update
                 this.winStreak++;
-                if (this.winStreak >= 4) { // Reached 5x (Index 3 is 5x)
-                    this.superWinSpinsLeft = 10; // Trigger Super Win Mode
+                if (this.winStreak >= 4) { 
+                    this.superWinSpinsLeft = 10; 
                     this.centerWinText.setText("SUPER WIN MODE!").setVisible(true);
                 }
                 this.updateMultiplierUI();
 
                 try { this.sound.play('win_sound'); } catch(e){}
                 this.showWinAnimation(win);
-                this.startCoinRain();
+                
+                // 🔥 Fix 3: Coin Rain (Only for Big Win: >5x Bet)
+                if(win > this.currentBet * 5) this.startCoinRain();
+                
                 fetch('/api/update-balance', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({username:this.currentUser.username, amount: win}) })
                 .then(r=>r.json()).then(d => { this.balance = d.newBalance; this.updateUI(); });
             } else {
-                // 🔥 Reset Streak on Loss
                 this.winStreak = 0;
                 this.updateMultiplierUI();
             }
@@ -392,14 +387,14 @@ class GameScene extends Phaser.Scene {
         const emitter = this.coinParticles.createEmitter({
             x: { min: 0, max: GAME_WIDTH },
             y: -50,
-            lifespan: 2500,
+            lifespan: 1500, // Short lifespan
             speedY: { min: 300, max: 600 },
-            scale: { start: 0.3, end: 0.3 }, // Smaller Coins
-            quantity: 4,
-            frequency: 50,
+            scale: { start: 0.2, end: 0.2 }, // Small coins
+            quantity: 1, // Sparse rain
+            frequency: 100,
             rotate: { min: 0, max: 360 }
         });
-        this.time.delayedCall(4000, () => emitter.stop());
+        this.time.delayedCall(2000, () => emitter.stop());
     }
 
     showWinAnimation(amount) {
@@ -414,7 +409,7 @@ class GameScene extends Phaser.Scene {
             let sym = grid[0][r], m = 1;
             for (let c=1; c<REEL_COUNT; c++) { if (grid[c][r] === sym) m++; else break; }
             if (m >= 3) {
-                let mult = MULTIPLIER_LEVELS[Math.min(this.winStreak, 3)]; // Apply multiplier
+                let mult = MULTIPLIER_LEVELS[Math.min(this.winStreak, 3)]; 
                 total += this.currentBet * SYMBOL_VALUES[sym] * (m-2) * mult;
             }
         }
@@ -455,14 +450,13 @@ class GameScene extends Phaser.Scene {
         const c = this.add.container(x, y, [bg, txt]);
         bg.on('pointerdown', () => { 
             this.tweens.add({targets:c, scale:0.9, yoyo:true, duration:50}); 
-            // 🔥 Fix: Close menu THEN open panel
+            // 🔥 Fix 2: Auto Close Menu
             this.toggleMenu(); 
-            this.time.delayedCall(250, cb); 
+            this.time.delayedCall(200, cb); 
         });
         return c;
     }
 
-    // --- DEPOSIT SYSTEM FIX ---
     showDepositPanel() {
         const { width, height } = this.scale;
         const c = this.add.container(width/2, height/2).setDepth(300);
@@ -478,7 +472,6 @@ class GameScene extends Phaser.Scene {
 
         const validate = (method, color) => {
             if(!amtInput.value || !phnInput.value) return alert("Fill all fields!");
-            // 🔥 Fix: 11 Digit Check
             if(phnInput.value.length !== 11) return alert("Sender Number must be 11 digits!");
             c.destroy();
             this.showPaymentPage(amtInput.value, method, phnInput.value, color);
@@ -530,7 +523,6 @@ class GameScene extends Phaser.Scene {
         const subBtn = this.add.text(0, 150, " SUBMIT REQUEST ", {fontSize:'26px', backgroundColor:'#00AA00', padding:10}).setOrigin(0.5).setInteractive({useHandCursor:true});
         subBtn.on('pointerdown', () => {
             if(!trxInput.value) return alert("Please Enter TrxID!");
-            // 🔥 Fix: TrxID Validation & Uppercase
             let finalTrx = trxInput.value.toUpperCase();
             if(!/^[A-Z0-9]+$/.test(finalTrx)) return alert("Invalid TrxID! Use Letters and Numbers.");
             
@@ -546,10 +538,10 @@ class GameScene extends Phaser.Scene {
         this.addCloseButton(c, ()=>c.destroy(), 250);
     }
 
-    // --- ADMIN PANEL ---
+    // --- ADMIN PANEL FIX (High Z-Index) ---
     showAdminDashboard() {
         const { width, height } = this.scale;
-        const c = this.add.container(width/2, height/2).setDepth(500);
+        const c = this.add.container(width/2, height/2).setDepth(2000); // 🔥 Fix: Higher than Menu
         c.add(this.add.rectangle(0, 0, 500, 800, 0x111111).setStrokeStyle(3, 0xFFD700));
         c.add(this.add.text(0, -360, "ADMIN CONTROL", { fontSize: '32px', fill: '#FFD700' }).setOrigin(0.5));
         
@@ -579,9 +571,9 @@ class GameScene extends Phaser.Scene {
         this.addCloseButton(c, ()=>c.destroy(), 350);
     }
 
-    showUserListPanel() { /* Same as before */ 
+    showUserListPanel() { 
         const { width, height } = this.scale;
-        const c = this.add.container(width/2, height/2).setDepth(600);
+        const c = this.add.container(width/2, height/2).setDepth(2100);
         c.add(this.add.rectangle(0, 0, 520, 800, 0x222222).setStrokeStyle(2, 0xFFD700));
         c.add(this.add.text(0, -350, "USER LIST (Click for Details)", { fontSize: '24px', fill: '#FFD700' }).setOrigin(0.5));
         this.addCloseButton(c, ()=>c.destroy(), 350);
@@ -597,9 +589,9 @@ class GameScene extends Phaser.Scene {
         });
     }
 
-    showUserDetails(username) { /* Same as before */
+    showUserDetails(username) {
         const { width, height } = this.scale;
-        const c = this.add.container(width/2, height/2).setDepth(700);
+        const c = this.add.container(width/2, height/2).setDepth(2200);
         c.add(this.add.rectangle(0, 0, 500, 700, 0x000000).setStrokeStyle(3, 0x00AAFF));
         c.add(this.add.text(0, -300, `USER: ${username}`, { fontSize: '28px', fill: '#00AAFF', fontStyle: 'bold' }).setOrigin(0.5));
         
@@ -619,7 +611,7 @@ class GameScene extends Phaser.Scene {
     
     showAdminRequestsPanel(type) {
         const { width, height } = this.scale;
-        const c = this.add.container(width/2, height/2).setDepth(500);
+        const c = this.add.container(width/2, height/2).setDepth(2100);
         c.add(this.add.rectangle(0, 0, 520, 800, 0x222222).setStrokeStyle(2, 0xFFD700));
         c.add(this.add.text(0, -350, `${type} REQ`, { fontSize: '28px', fill: '#FFD700' }).setOrigin(0.5));
         this.addCloseButton(c, ()=>c.destroy(), 350);

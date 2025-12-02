@@ -134,7 +134,6 @@ app.post('/api/register', async (req, res) => {
     } catch (err) { res.status(500).json({ success: false, message: 'Error' }); }
 });
 
-// 🔥 Fix: Return ownReferralCode clearly
 app.get('/api/user-data', async (req, res) => {
     try {
         const user = await User.findOne({ username: req.query.username });
