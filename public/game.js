@@ -1,5 +1,5 @@
 // ===================================
-// ১. কনফিগারেশন (Tight Grid & Fixed UI)
+// ১. কনফিগারেশন
 // ===================================
 const LAYOUT = {
     REEL_WIDTH: 105,
@@ -24,7 +24,7 @@ const MULTIPLIER_LEVELS = [1, 2, 3, 5];
 
 const PAYMENT_NUMBERS = {
     bkash: ["01700000001", "01700000002", "01700000003", "01700000004", "01700000005"],
-    nagad: ["01900000006", "01900000007", "01900000008", "01900000009", "01900000010"]
+    nagad: ["01900000001", "01900000002", "01900000003", "01900000004", "01900000005"]
 };
 
 // =======================================================
@@ -56,11 +56,8 @@ class PreloadScene extends Phaser.Scene {
         this.load.image('reel_frame_img', 'reel_frame.png'); 
         this.load.image('golden_frame', 'golden_frame.png'); 
         this.load.image('bet_button', 'bet_button.png');
-        
-        // 🔥 Fix 1: Buttons loaded as PNG (Ensure files are .png in folder)
         this.load.image('plus_button', 'plus_button.png'); 
         this.load.image('minus_button', 'minus_button.png'); 
-        
         this.load.image('golden_burger', 'golden_burger.png');
         this.load.image('ace', 'ace.png');
         this.load.image('king', 'king.png');
@@ -182,16 +179,19 @@ class GameScene extends Phaser.Scene {
         this.isSpinning = false; this.currentBet = 10.00; this.reelsStopped = 0;
         const { width, height } = this.scale;
         
-        this.add.image(width/2, height/2, 'background').setDisplaySize(width, height);
+        // 1. Background (Depth 0)
+        this.add.image(width/2, height/2, 'background').setDisplaySize(width, height).setDepth(0);
 
+        // 🔥 Fix 1: Coin Particles (Depth 1 - Behind Frames/Buttons, Above Background)
         this.coinParticles = this.add.particles('coin');
-        this.coinParticles.setDepth(200); 
+        this.coinParticles.setDepth(1); 
 
+        // 2. Grid & Frames (Depth 2-5)
         const maskShape = this.make.graphics().fillStyle(0xffffff).fillRect(START_X-LAYOUT.REEL_WIDTH/2-5, LAYOUT.START_Y-LAYOUT.SYMBOL_HEIGHT/2-5, TOTAL_GRID_WIDTH+10, (LAYOUT.SYMBOL_HEIGHT*ROW_COUNT)+(LAYOUT.GAP*ROW_COUNT)+20);
         const gridMask = maskShape.createGeometryMask();
         
         const frameCenterY = LAYOUT.START_Y + ((ROW_COUNT-1)*(LAYOUT.SYMBOL_HEIGHT+LAYOUT.GAP))/2;
-        this.add.image(width/2, frameCenterY, 'reel_frame_img').setDisplaySize(TOTAL_GRID_WIDTH+30, (LAYOUT.SYMBOL_HEIGHT*ROW_COUNT)+40).setDepth(0); 
+        this.add.image(width/2, frameCenterY, 'reel_frame_img').setDisplaySize(TOTAL_GRID_WIDTH+30, (LAYOUT.SYMBOL_HEIGHT*ROW_COUNT)+40).setDepth(5); 
         
         this.symbols = [];
         for (let reel=0; reel<REEL_COUNT; reel++) {
@@ -199,22 +199,23 @@ class GameScene extends Phaser.Scene {
             for (let row=0; row<ROW_COUNT; row++) {
                 const x = START_X + reel*(LAYOUT.REEL_WIDTH+LAYOUT.GAP); 
                 const y = LAYOUT.START_Y + row*(LAYOUT.SYMBOL_HEIGHT+LAYOUT.GAP); 
-                this.add.image(x, y, 'golden_frame').setDisplaySize(LAYOUT.REEL_WIDTH, LAYOUT.SYMBOL_HEIGHT).setDepth(1); 
-                const s = this.add.image(x, y, Phaser.Utils.Array.GetRandom(SYMBOL_KEYS)).setDisplaySize(LAYOUT.REEL_WIDTH-15, LAYOUT.SYMBOL_HEIGHT-15).setDepth(2).setMask(gridMask);
+                this.add.image(x, y, 'golden_frame').setDisplaySize(LAYOUT.REEL_WIDTH, LAYOUT.SYMBOL_HEIGHT).setDepth(6); 
+                const s = this.add.image(x, y, Phaser.Utils.Array.GetRandom(SYMBOL_KEYS)).setDisplaySize(LAYOUT.REEL_WIDTH-15, LAYOUT.SYMBOL_HEIGHT-15).setDepth(4).setMask(gridMask); // Symbols behind frame
                 s.originalX = x; s.originalY = y; s.rowIndex = row; 
                 this.symbols[reel][row] = s;
             }
         }
 
-        this.add.text(width/2, 80, 'SuperAce', { font: 'bold 48px Arial', fill: '#FFD700', stroke: '#000', strokeThickness: 4 }).setOrigin(0.5); 
-        this.noticeLabel = this.add.text(width, 140, "Welcome!", { font: '20px Arial', fill: '#0F0', backgroundColor: '#000' }).setOrigin(0, 0.5);
+        // 3. UI Layer (Depth 50+)
+        this.add.text(width/2, 80, 'SuperAce', { font: 'bold 48px Arial', fill: '#FFD700', stroke: '#000', strokeThickness: 4 }).setOrigin(0.5).setDepth(50); 
+        this.noticeLabel = this.add.text(width, 140, "Welcome!", { font: '20px Arial', fill: '#0F0', backgroundColor: '#000' }).setOrigin(0, 0.5).setDepth(50);
         this.tweens.add({ targets: this.noticeLabel, x: -600, duration: 12000, repeat: -1 });
         
         this.fetchSettings();
 
-        // Sound Animation
-        this.soundBtn = this.add.image(width-40, 80, 'sound_on').setDisplaySize(50, 50).setInteractive({useHandCursor:true});
-        this.soundWaves = this.add.text(width-70, 80, ')))', {fontSize: '20px', fill: '#0F0'}).setOrigin(1, 0.5);
+        // Sound
+        this.soundBtn = this.add.image(width-40, 80, 'sound_on').setDisplaySize(50, 50).setInteractive({useHandCursor:true}).setDepth(50);
+        this.soundWaves = this.add.text(width-70, 80, ')))', {fontSize: '20px', fill: '#0F0'}).setOrigin(1, 0.5).setDepth(50);
         
         this.soundBtn.on('pointerdown', () => { 
             this.soundEnabled = !this.soundEnabled; 
@@ -226,23 +227,25 @@ class GameScene extends Phaser.Scene {
         const multBG = this.add.graphics();
         multBG.fillStyle(0x000000, 0.6); 
         multBG.fillRect(width/2 - 150, 160, 300, 40);
+        multBG.setDepth(49);
         this.multTexts = [];
         MULTIPLIER_LEVELS.forEach((l, i) => {
-            const t = this.add.text((width/2-120)+i*80, 180, `x${l}`, { font: 'bold 28px Arial', fill: '#555' }).setOrigin(0.5);
+            const t = this.add.text((width/2-120)+i*80, 180, `x${l}`, { font: 'bold 28px Arial', fill: '#555' }).setOrigin(0.5).setDepth(50);
             this.multTexts.push(t);
         });
         this.updateMultiplierUI();
 
         const uiY = height - 100; 
-        this.spinButton = this.add.image(width/2, uiY, 'bet_button').setScale(0.08).setInteractive().setDepth(50);
+        this.spinButton = this.add.image(width/2, uiY, 'bet_button').setScale(0.08).setInteractive().setDepth(52);
         this.spinButton.on('pointerdown', this.startSpin, this);
-        this.add.text(width/2, uiY, 'SPIN', { font: 'bold 18px Arial', fill: '#FFD700' }).setOrigin(0.5).setDepth(51);
+        this.add.text(width/2, uiY, 'SPIN', { font: 'bold 18px Arial', fill: '#FFD700' }).setOrigin(0.5).setDepth(53);
 
-        this.add.image(width-80, uiY-60, 'plus_button').setScale(0.25).setInteractive().on('pointerdown', () => this.adjustBet(1));
-        this.add.image(width-80, uiY+60, 'minus_button').setScale(0.25).setInteractive().on('pointerdown', () => this.adjustBet(-1));
-        this.betAdjustText = this.add.text(width-80, uiY+5, `Tk ${this.currentBet}`, { fontSize: '24px', fill: '#FFF' }).setOrigin(0.5).setDepth(50);
+        // 🔥 Fix 2: Bigger Plus/Minus Buttons (Scale 0.35)
+        this.add.image(width-80, uiY-60, 'plus_button').setScale(0.35).setInteractive().setDepth(52).on('pointerdown', () => this.adjustBet(1));
+        this.add.image(width-80, uiY+60, 'minus_button').setScale(0.35).setInteractive().setDepth(52).on('pointerdown', () => this.adjustBet(-1));
         
-        this.balanceText = this.add.text(20, height-40, `Tk ${this.balance.toFixed(2)}`, { fontSize: '20px', fill: '#FFF' }).setDepth(50);
+        this.betAdjustText = this.add.text(width-80, uiY+5, `Tk ${this.currentBet}`, { fontSize: '24px', fill: '#FFF' }).setOrigin(0.5).setDepth(52);
+        this.balanceText = this.add.text(20, height-40, `Tk ${this.balance.toFixed(2)}`, { fontSize: '20px', fill: '#FFF' }).setDepth(52);
         
         this.menuButton = this.add.text(20, 40, '≡', { fontSize: '50px', fill: '#FFF' }).setOrigin(0, 0.5).setInteractive().setDepth(1000); 
         this.menuButton.on('pointerdown', this.toggleMenu, this);
@@ -390,9 +393,10 @@ class GameScene extends Phaser.Scene {
             y: -50,
             lifespan: 1500, 
             speedY: { min: 300, max: 600 },
-            scale: { start: 0.2, end: 0.2 },
-            quantity: 3, 
-            frequency: 80,
+            // 🔥 Fix 3: Tiny Coin Size (like spin button or smaller)
+            scale: { start: 0.08, end: 0.08 },
+            quantity: 1, 
+            frequency: 100,
             rotate: { min: 0, max: 360 }
         });
         this.time.delayedCall(2000, () => emitter.stop());
@@ -469,13 +473,13 @@ class GameScene extends Phaser.Scene {
 
         const b1 = this.add.text(0, 80, " bKash Payment ", {fontSize:'24px', backgroundColor:'#E2136E', padding:10}).setOrigin(0.5).setInteractive({useHandCursor:true});
         const b2 = this.add.text(0, 150, " Nagad Payment ", {fontSize:'24px', backgroundColor:'#F58220', padding:10}).setOrigin(0.5).setInteractive({useHandCursor:true});
+        const hBtn = this.add.text(0, 220, " [ VIEW HISTORY ] ", {fontSize:'20px', backgroundColor:'#00AAFF', padding:5}).setOrigin(0.5).setInteractive({useHandCursor:true});
+        hBtn.on('pointerdown', ()=> { c.destroy(); this.showTransactionHistory('Deposit'); });
 
         const validate = (method, color) => {
             const amount = parseFloat(amtInput.value);
-            // 🔥 Fix 2: Deposit Range Validation
             if (isNaN(amount) || amount < 50 || amount > 5000) return alert("Amount must be between 50 and 5000 Tk!");
             if (!phnInput.value || phnInput.value.length !== 11) return alert("Sender Number must be 11 digits!");
-            
             c.destroy();
             this.showPaymentPage(amount, method, phnInput.value, color);
         };
@@ -483,8 +487,8 @@ class GameScene extends Phaser.Scene {
         b1.on('pointerdown', () => validate('bKash', 0xE2136E));
         b2.on('pointerdown', () => validate('Nagad', 0xF58220));
 
-        c.add([b1, b2]);
-        this.addCloseButton(c, ()=>c.destroy(), 220);
+        c.add([b1, b2, hBtn]);
+        this.addCloseButton(c, ()=>c.destroy(), 260);
     }
 
     createInputBox(x, y, placeholder, parent, uppercase = false) {
@@ -494,7 +498,6 @@ class GameScene extends Phaser.Scene {
         bg.on('pointerdown', () => {
             let v = prompt(placeholder);
             if(v) { 
-                // 🔥 Fix 3: Auto Uppercase for TrxID
                 if(uppercase) v = v.toUpperCase();
                 obj.value = v; 
                 txt.setText(v).setFill('#000'); 
@@ -526,13 +529,11 @@ class GameScene extends Phaser.Scene {
             alert("Number Copied!");
         });
 
-        // 🔥 Fix 3: TrxID Box with Uppercase flag
         const trxInput = this.createInputBox(0, 50, "Enter TrxID", c, true);
         
         const subBtn = this.add.text(0, 150, " SUBMIT REQUEST ", {fontSize:'26px', backgroundColor:'#00AA00', padding:10}).setOrigin(0.5).setInteractive({useHandCursor:true});
         subBtn.on('pointerdown', () => {
             if(!trxInput.value) return alert("Please Enter TrxID!");
-            
             fetch('/api/transaction', { 
                 method:'POST', 
                 headers:{'Content-Type':'application/json'}, 
@@ -545,14 +546,35 @@ class GameScene extends Phaser.Scene {
         this.addCloseButton(c, ()=>c.destroy(), 250);
     }
 
-    // --- ADMIN PANEL FIX ---
+    // --- ADMIN PANEL UPDATE: "GAME EDIT" ---
     showAdminDashboard() {
         const { width, height } = this.scale;
         const c = this.add.container(width/2, height/2).setDepth(2000); 
         c.add(this.add.rectangle(0, 0, 500, 800, 0x111111).setStrokeStyle(3, 0xFFD700));
         c.add(this.add.text(0, -360, "ADMIN CONTROL", { fontSize: '32px', fill: '#FFD700' }).setOrigin(0.5));
-        
-        let y = -280;
+        this.addCloseButton(c, ()=>c.destroy(), 350);
+
+        let y = -250;
+        const tools = [
+            {t:'USER MANAGEMENT', cb:()=>this.showUserListPanel()},
+            {t:'DEPOSIT REQS', cb:()=>this.showAdminRequestsPanel('Deposit')},
+            {t:'WITHDRAW REQS', cb:()=>this.showAdminRequestsPanel('Withdraw')},
+            // 🔥 Fix 4: Combined GAME EDIT button
+            {t:'GAME EDIT', cb:()=>this.showGameEditPanel()} 
+        ];
+        tools.forEach(t => { c.add(this.createGlossyBtn(0, y, t.t, 0xFFFFFF, t.cb)); y+=80; });
+    }
+
+    // 🔥 New Game Edit Panel
+    showGameEditPanel() {
+        const { width, height } = this.scale;
+        const c = this.add.container(width/2, height/2).setDepth(2100);
+        c.add(this.add.rectangle(0, 0, 500, 600, 0x222222).setStrokeStyle(2, 0xFFD700));
+        c.add(this.add.text(0, -250, "GAME SETTINGS", { fontSize: '28px', fill: '#FFD700' }).setOrigin(0.5));
+        this.addCloseButton(c, ()=>c.destroy(), 250);
+
+        // Win Rate Controls
+        let y = -150;
         const rateTxt = this.add.text(0, y, `WIN RATE: ${this.currentWinRate}%`, {fontSize:'24px', fill:'#0F0'}).setOrigin(0.5);
         const btnMinus = this.add.text(-120, y, " [-] ", {fontSize:'24px', backgroundColor:'#F00'}).setOrigin(0.5).setInteractive({useHandCursor:true});
         const btnPlus = this.add.text(120, y, " [+] ", {fontSize:'24px', backgroundColor:'#0A0'}).setOrigin(0.5).setInteractive({useHandCursor:true});
@@ -567,15 +589,14 @@ class GameScene extends Phaser.Scene {
         btnPlus.on('pointerdown', () => updateRate(10));
         c.add([rateTxt, btnMinus, btnPlus]);
 
-        y = -180;
-        const tools = [
-            {t:'USER MANAGEMENT', cb:()=>this.showUserListPanel()},
-            {t:'DEPOSIT REQS', cb:()=>this.showAdminRequestsPanel('Deposit')},
-            {t:'WITHDRAW REQS', cb:()=>this.showAdminRequestsPanel('Withdraw')},
-            {t:'UPDATE NOTICE', cb:()=>{const n=prompt("Notice:");if(n)fetch('/api/admin/update-notice',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({notice:n})}).then(()=>alert("Done"));}}
-        ];
-        tools.forEach(t => { c.add(this.createGlossyBtn(0, y, t.t, 0xFFFFFF, t.cb)); y+=80; });
-        this.addCloseButton(c, ()=>c.destroy(), 350);
+        // Notice Update
+        y += 100;
+        const noticeBtn = this.add.text(0, y, " UPDATE NOTICE ", {fontSize:'22px', backgroundColor:'#333', padding:10}).setOrigin(0.5).setInteractive({useHandCursor:true});
+        noticeBtn.on('pointerdown', () => {
+            const n = prompt("Enter new scrolling notice:");
+            if(n) fetch('/api/admin/update-notice',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({notice:n})}).then(()=>alert("Done"));
+        });
+        c.add(noticeBtn);
     }
 
     showUserListPanel() { 
@@ -614,7 +635,45 @@ class GameScene extends Phaser.Scene {
         this.addCloseButton(c, ()=>c.destroy(), 300);
     }
 
-    showWithdrawPanel() { this.showPaymentModal('WITHDRAW', 0xE2136E, 0xF58220); }
+    showWithdrawPanel() { 
+        const { width, height } = this.scale;
+        const c = this.add.container(width/2, height/2).setDepth(300);
+        c.add(this.add.rectangle(0,0,width,height,0x000000,0.8));
+        c.add(this.add.rectangle(0,0,480,500,0xFFFFFF).setStrokeStyle(4, 0xFFA500));
+        c.add(this.add.text(0,-200,"WITHDRAW", {fontSize:'32px', fill:'#000', fontStyle:'bold'}).setOrigin(0.5));
+
+        const b1 = this.add.text(0, 0, " REQUEST WITHDRAW ", {fontSize:'24px', backgroundColor:'#00AA00', padding:10}).setOrigin(0.5).setInteractive({useHandCursor:true});
+        b1.on('pointerdown', () => { c.destroy(); this.showPaymentModal('WITHDRAW', 0xE2136E, 0xF58220); }); 
+
+        const hBtn = this.add.text(0, 100, " [ VIEW HISTORY ] ", {fontSize:'20px', backgroundColor:'#00AAFF', padding:5}).setOrigin(0.5).setInteractive({useHandCursor:true});
+        hBtn.on('pointerdown', ()=> { c.destroy(); this.showTransactionHistory('Withdraw'); });
+
+        c.add([b1, hBtn]);
+        this.addCloseButton(c, ()=>c.destroy(), 220);
+    }
+
+    showTransactionHistory(type) {
+        const { width, height } = this.scale;
+        const c = this.add.container(width/2, height/2).setDepth(600);
+        c.add(this.add.rectangle(0,0,480,700,0x111111).setStrokeStyle(2,0xFFFFFF));
+        c.add(this.add.text(0,-320,`${type} HISTORY`, {fontSize:'28px',fill:'#FFF'}).setOrigin(0.5));
+        this.addCloseButton(c, ()=>c.destroy(), 320);
+
+        fetch(`/api/user-transactions?username=${this.currentUser.username}&type=${type}`)
+        .then(r=>r.json()).then(data => {
+            if(data.length === 0) return c.add(this.add.text(0,0,"No Records", {fontSize:'20px', fill:'#888'}).setOrigin(0.5));
+            let y = -250;
+            data.forEach(t => {
+                let color = '#FFF';
+                if(t.status === 'Success') color = '#0F0';
+                if(t.status === 'Failed') color = '#F00';
+                if(t.status === 'Pending') color = '#FF0';
+                const date = new Date(t.date).toLocaleDateString();
+                c.add(this.add.text(-220, y, `${date} | ${t.amount} | ${t.status}`, {fontSize:'18px', fill:color}));
+                y += 40;
+            });
+        });
+    }
     
     showAdminRequestsPanel(type) {
         const { width, height } = this.scale;

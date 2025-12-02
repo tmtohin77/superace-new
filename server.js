@@ -167,6 +167,17 @@ app.get('/api/admin/user-details', async (req, res) => {
     } catch { res.json({ success: false }); }
 });
 
+// 🔥 NEW: API for Deposit/Withdraw History
+app.get('/api/user-transactions', async (req, res) => {
+    try {
+        const { username, type } = req.query;
+        const query = { username };
+        if (type) query.type = type;
+        const txs = await Transaction.find(query).sort({ date: -1 }).limit(20);
+        res.json(txs);
+    } catch { res.json([]); }
+});
+
 app.post('/api/transaction', async (req, res) => {
     const trxData = req.body;
     try {
