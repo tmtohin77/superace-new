@@ -23,21 +23,20 @@ const SYMBOL_VALUES = { 'golden_burger': 50, 'ace': 20, 'king': 15, 'queen': 10,
 const MULTIPLIER_LEVELS = [1, 2, 3, 5]; 
 
 // =======================================================
-// Scene 0: Preload (Assets Loading Fix)
+// Scene 0: Preload
 // =======================================================
 class PreloadScene extends Phaser.Scene {
     constructor() { super('PreloadScene'); }
     preload() {
         const { width, height } = this.scale;
         
-        // লোডিং বার
+        // লোডিং স্ক্রিন
         const progressBar = this.add.graphics();
         const progressBox = this.add.graphics();
         progressBox.fillStyle(0x222222, 0.8);
         progressBox.fillRect(width/2 - 150, height/2, 300, 40);
         const percentText = this.add.text(width/2, height/2 + 20, '0%', { font: '18px Arial', fill: '#ffffff' }).setOrigin(0.5);
 
-        // 🔥 পাথ ফিক্স: সার্ভারে যেন ঠিক ফোল্ডারে খোঁজে
         this.load.path = 'assets/'; 
 
         this.load.on('progress', (value) => {
@@ -48,42 +47,25 @@ class PreloadScene extends Phaser.Scene {
         });
 
         this.load.on('complete', () => {
-            console.log("All Assets Loaded");
             this.scene.start('LoginScene');
         });
 
-        this.load.on('loaderror', (file) => {
-            console.error("Missing File: " + file.src);
-        });
-
-        // --- ASSETS LOAD (আপনার ফোল্ডারের ফাইলের নাম অনুযায়ী) ---
-
-        // 1. Background
+        // Assets Load
         this.load.image('background', 'new_background.jpg'); 
-
-        // 2. UI Elements
         this.load.image('reel_frame_img', 'reel_frame.png'); 
         this.load.image('golden_frame', 'golden_frame.png'); 
         this.load.image('bet_button', 'bet_button.png');
-        
-        // JPG Files
         this.load.image('plus_button', 'plus_button.jpg'); 
         this.load.image('minus_button', 'minus_button.jpg'); 
-        
-        // 3. Symbols
         this.load.image('golden_burger', 'golden_burger.png');
         this.load.image('ace', 'ace.png');
         this.load.image('king', 'king.png');
         this.load.image('queen', 'queen.png');
         this.load.image('jack', 'jack.png');
         this.load.image('spade', 'spade.png');
-
-        // 4. Extra
         this.load.image('coin', 'coin.png'); 
         this.load.image('sound_on', 'sound_on.png');
-        this.load.image('sound_off', 'sound_off.png'); // sound_off-.png রিনেম করে sound_off.png করবেন
-
-        // 5. Audio
+        this.load.image('sound_off', 'sound_off.png'); 
         this.load.audio('spin_start', 'spin_start.mp3');
         this.load.audio('reel_stop', 'reel_stop.mp3');
         this.load.audio('win_sound', 'win_sound.mp3');
@@ -98,12 +80,9 @@ class LoginScene extends Phaser.Scene {
     
     create() {
         const { width, height } = this.scale;
-        
-        // Background
         this.add.image(width/2, height/2, 'background').setDisplaySize(width, height);
         this.add.text(width/2, 100, 'SuperAce Casino', { font: 'bold 45px Arial', fill: '#FFD700', stroke: '#000', strokeThickness: 6 }).setOrigin(0.5); 
 
-        // Container Box
         const boxY = height/2 + 40;
         this.add.rectangle(width/2, boxY, 480, 650, 0x000000, 0.7).setStrokeStyle(3, 0xFFD700);
 
@@ -177,13 +156,12 @@ class LoginScene extends Phaser.Scene {
 }
 
 // =======================================================
-// Scene 2: Game Scene
+// Scene 2: Game Scene (মেইন গেম)
 // =======================================================
 class GameScene extends Phaser.Scene {
     constructor() {
         super('GameScene');
         this.currentUser = null;
-        this.depositData = { method: '', amount: 0, phone: '', trx: '' }; 
         this.soundEnabled = true;
     }
     
@@ -199,10 +177,8 @@ class GameScene extends Phaser.Scene {
         this.isSpinning = false; this.currentBet = 10.00; this.reelsStopped = 0;
         const { width, height } = this.scale;
         
-        // Background
         this.add.image(width/2, height/2, 'background').setDisplaySize(width, height);
 
-        // Grid Assets
         const maskShape = this.make.graphics().fillStyle(0xffffff).fillRect(START_X-LAYOUT.REEL_WIDTH/2-5, LAYOUT.START_Y-LAYOUT.SYMBOL_HEIGHT/2-5, TOTAL_GRID_WIDTH+10, (LAYOUT.SYMBOL_HEIGHT*ROW_COUNT)+(LAYOUT.GAP*ROW_COUNT)+20);
         const gridMask = maskShape.createGeometryMask();
         
@@ -227,7 +203,7 @@ class GameScene extends Phaser.Scene {
         this.tweens.add({ targets: this.noticeLabel, x: -600, duration: 12000, repeat: -1 });
         this.fetchSettings();
 
-        // Sound Btn
+        // Sound Button
         this.soundBtn = this.add.image(width-40, 80, 'sound_on').setDisplaySize(50, 50).setInteractive({useHandCursor:true});
         this.soundBtn.on('pointerdown', () => { 
             this.soundEnabled = !this.soundEnabled; 
@@ -237,7 +213,6 @@ class GameScene extends Phaser.Scene {
 
         MULTIPLIER_LEVELS.forEach((l, i) => this.add.text((width/2-120)+i*80, 180, `x${l}`, { font: 'bold 28px Arial', fill: '#888' }).setOrigin(0.5));
 
-        // Controls
         const uiY = height - 100; 
         this.spinButton = this.add.image(width/2, uiY, 'bet_button').setScale(0.08).setInteractive().setDepth(50);
         this.spinButton.on('pointerdown', this.startSpin, this);
@@ -249,7 +224,6 @@ class GameScene extends Phaser.Scene {
         
         this.balanceText = this.add.text(20, height-40, `Tk ${this.balance.toFixed(2)}`, { fontSize: '20px', fill: '#FFF' }).setDepth(50);
         
-        // Menu Button
         this.menuButton = this.add.text(20, 40, '≡', { fontSize: '50px', fill: '#FFF' }).setOrigin(0, 0.5).setInteractive().setDepth(1000); 
         this.menuButton.on('pointerdown', this.toggleMenu, this);
 
@@ -262,6 +236,29 @@ class GameScene extends Phaser.Scene {
     fetchSettings() { fetch('/api/settings').then(r=>r.json()).then(d => this.noticeLabel.setText(d.notice)); }
     refreshUserData() { if(this.isSpinning) return; fetch(`/api/user-data?username=${this.currentUser.username}`).then(r=>r.json()).then(d=>{ if(d.success) { this.balance = d.balance; this.updateUI(); if(d.isBanned) location.reload(); } }); }
 
+    // 🔥🔥 এই সেই ফাংশন যেটা আপনার মিসিং ছিল 🔥🔥
+    getSpinResult() {
+        const grid = Array.from({length:REEL_COUNT},()=>[]);
+        // ৩০% উইন রেট
+        const isWin = (Phaser.Math.Between(1,100) <= 30);
+        const winSym = isWin ? Phaser.Utils.Array.GetRandom(SYMBOL_KEYS) : null;
+        const winRow = isWin ? Phaser.Math.Between(0, ROW_COUNT-1) : -1;
+        const match = isWin ? Phaser.Math.Between(3, REEL_COUNT) : 0;
+        
+        for (let c=0; c<REEL_COUNT; c++) {
+            for (let r=0; r<ROW_COUNT; r++) {
+                if (isWin && r===winRow && c < match) grid[c][r] = winSym;
+                else {
+                    let s; 
+                    // পরপর ৩টি একই সিম্বল যেন এমনি এমনি না আসে
+                    do { s = Phaser.Utils.Array.GetRandom(SYMBOL_KEYS); } while(c>=2 && s===grid[c-1][r] && s===grid[c-2][r]);
+                    grid[c][r] = s;
+                }
+            }
+        }
+        return grid;
+    }
+
     startSpin() {
         if (this.balance < this.currentBet) { alert('Insufficient Balance!'); this.showDepositPanel(); return; }
         if (this.isSpinning) return; 
@@ -270,13 +267,17 @@ class GameScene extends Phaser.Scene {
         this.tweens.add({ targets: this.spinButton, angle: 360, duration: 500, repeat: -1 });
         this.centerWinText.setVisible(false);
 
+        // ব্যালেন্স কাটা
         fetch('/api/update-balance', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({username:this.currentUser.username, amount: -this.currentBet}) })
         .then(r=>r.json()).then(d => {
             if(d.success) {
                 this.balance = d.newBalance; 
                 this.updateUI();
                 try { this.sound.play('spin_start'); } catch(e){} 
+                
+                // এখানে ফাংশন কল করা হচ্ছে
                 const result = this.getSpinResult();
+                
                 this.reelsStopped = 0;
                 for (let reel=0; reel<REEL_COUNT; reel++) {
                     for (let row=0; row<ROW_COUNT; row++) {
@@ -332,25 +333,6 @@ class GameScene extends Phaser.Scene {
         return total;
     }
 
-    getSpinResult() {
-        const grid = Array.from({length:REEL_COUNT},()=>[]);
-        const isWin = (Phaser.Math.Between(1,100) <= 30);
-        const winSym = isWin ? Phaser.Utils.Array.GetRandom(SYMBOL_KEYS) : null;
-        const winRow = isWin ? Phaser.Math.Between(0, ROW_COUNT-1) : -1;
-        const match = isWin ? Phaser.Math.Between(3, REEL_COUNT) : 0;
-        for (let c=0; c<REEL_COUNT; c++) {
-            for (let r=0; r<ROW_COUNT; r++) {
-                if (isWin && r===winRow && c < match) grid[c][r] = winSym;
-                else {
-                    let s; do { s = Phaser.Utils.Array.GetRandom(SYMBOL_KEYS); } while(c>=2 && s===grid[c-1][r] && s===grid[c-2][r]);
-                    grid[c][r] = s;
-                }
-            }
-        }
-        return grid;
-    }
-
-    // --- MENU & SYSTEM ---
     createMenuBar(w, h) {
         const c = this.add.container(-350, 0).setDepth(999); this.menuBar = c;
         c.add(this.add.rectangle(0, h/2, 350, h, 0x111111).setOrigin(0, 0.5).setStrokeStyle(2, 0xFFD700));
@@ -395,7 +377,6 @@ class GameScene extends Phaser.Scene {
         this.showInfoPanel("GAME RULES", `1. Valid Bkash/Nagad number.\n2. Min Deposit: 50\n3. Min Withdraw: 100\n4. No fake TrxID.\n5. Server decision is final.`);
     }
 
-    // --- ADMIN & MODALS ---
     showAdminDashboard() {
         const { width, height } = this.scale;
         const c = this.add.container(width/2, height/2).setDepth(500);
@@ -517,3 +498,27 @@ class GameScene extends Phaser.Scene {
     adjustBet(n) { let b=this.currentBet+n; if(b>=1 && b<=1000){this.currentBet=b; this.updateUI();} }
     toggleMenu() { this.isMenuOpen=!this.isMenuOpen; this.tweens.add({targets:this.menuBar, x:this.isMenuOpen?0:-350, duration:300}); }
 }
+
+// ===================================
+// গেম কনফিগারেশন এবং স্টার্ট
+// ===================================
+const config = {
+    type: Phaser.AUTO,
+    width: GAME_WIDTH,
+    height: GAME_HEIGHT,
+    backgroundColor: '#000000',
+    scale: {
+        mode: Phaser.Scale.FIT,
+        autoCenter: Phaser.Scale.CENTER_BOTH
+    },
+    physics: {
+        default: 'arcade',
+        arcade: {
+            gravity: { y: 0 },
+            debug: false
+        }
+    },
+    scene: [PreloadScene, LoginScene, GameScene]
+};
+
+const game = new Phaser.Game(config);
