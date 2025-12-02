@@ -1,11 +1,11 @@
 // ===================================
-// ১. কনফিগারেশন
+// ১. কনফিগারেশন (LAYOUT UPDATE: Tight Grid)
 // ===================================
 const LAYOUT = {
     REEL_WIDTH: 105,
-    SYMBOL_HEIGHT: 140,
-    GAP: 10,
-    START_Y: 340,
+    SYMBOL_HEIGHT: 130, // Reduced height for tight fit
+    GAP: 2, // Very small gap
+    START_Y: 345,
     BTN_W: 240,
     BTN_H: 60
 };
@@ -22,7 +22,7 @@ const SYMBOL_KEYS = ['golden_burger', 'ace', 'king', 'queen', 'jack', 'spade'];
 const SYMBOL_VALUES = { 'golden_burger': 50, 'ace': 20, 'king': 15, 'queen': 10, 'jack': 8, 'spade': 5 };
 const MULTIPLIER_LEVELS = [1, 2, 3, 5]; 
 
-// 🔥 Rotation Numbers (10 Numbers - 5 Bkash, 5 Nagad)
+// Payment Numbers (Auto Rotate logic handled in deposit panel)
 const PAYMENT_NUMBERS = {
     bkash: ["01700000001", "01700000002", "01700000003", "01700000004", "01700000005"],
     nagad: ["01900000001", "01900000002", "01900000003", "01900000004", "01900000005"]
@@ -75,7 +75,7 @@ class PreloadScene extends Phaser.Scene {
 }
 
 // =======================================================
-// Scene 1: Login
+// Scene 1: Login (Same as before)
 // =======================================================
 class LoginScene extends Phaser.Scene {
     constructor() { super('LoginScene'); this.username = ''; this.password = ''; this.mobile = ''; this.newUsername = ''; this.newPassword = ''; this.refCode = ''; }
@@ -156,7 +156,7 @@ class LoginScene extends Phaser.Scene {
 }
 
 // =======================================================
-// Scene 2: Main Game
+// Scene 2: Main Game (Logic Updated)
 // =======================================================
 class GameScene extends Phaser.Scene {
     constructor() {
@@ -164,6 +164,8 @@ class GameScene extends Phaser.Scene {
         this.currentUser = null;
         this.soundEnabled = true;
         this.currentWinRate = 30;
+        this.winStreak = 0; // 🔥 Track consecutive wins
+        this.superWinSpinsLeft = 0; // 🔥 For Super Win Mode
     }
     
     init(data) {
@@ -180,14 +182,15 @@ class GameScene extends Phaser.Scene {
         
         this.add.image(width/2, height/2, 'background').setDisplaySize(width, height);
 
-        // Coin Emitter (For Big Win)
+        // Coin Emitter (Top Layer Fix)
         this.coinParticles = this.add.particles('coin');
+        this.coinParticles.setDepth(2000); // 🔥 Ensure it's on top of EVERYTHING
 
         const maskShape = this.make.graphics().fillStyle(0xffffff).fillRect(START_X-LAYOUT.REEL_WIDTH/2-5, LAYOUT.START_Y-LAYOUT.SYMBOL_HEIGHT/2-5, TOTAL_GRID_WIDTH+10, (LAYOUT.SYMBOL_HEIGHT*ROW_COUNT)+(LAYOUT.GAP*ROW_COUNT)+20);
         const gridMask = maskShape.createGeometryMask();
         
         const frameCenterY = LAYOUT.START_Y + ((ROW_COUNT-1)*(LAYOUT.SYMBOL_HEIGHT+LAYOUT.GAP))/2;
-        this.add.image(width/2, frameCenterY, 'reel_frame_img').setDisplaySize(TOTAL_GRID_WIDTH+50, (LAYOUT.SYMBOL_HEIGHT*ROW_COUNT)+60).setDepth(0); 
+        this.add.image(width/2, frameCenterY, 'reel_frame_img').setDisplaySize(TOTAL_GRID_WIDTH+30, (LAYOUT.SYMBOL_HEIGHT*ROW_COUNT)+40).setDepth(0); 
         
         this.symbols = [];
         for (let reel=0; reel<REEL_COUNT; reel++) {
@@ -196,7 +199,7 @@ class GameScene extends Phaser.Scene {
                 const x = START_X + reel*(LAYOUT.REEL_WIDTH+LAYOUT.GAP); 
                 const y = LAYOUT.START_Y + row*(LAYOUT.SYMBOL_HEIGHT+LAYOUT.GAP); 
                 this.add.image(x, y, 'golden_frame').setDisplaySize(LAYOUT.REEL_WIDTH, LAYOUT.SYMBOL_HEIGHT).setDepth(1); 
-                const s = this.add.image(x, y, Phaser.Utils.Array.GetRandom(SYMBOL_KEYS)).setDisplaySize(LAYOUT.REEL_WIDTH-20, LAYOUT.SYMBOL_HEIGHT-20).setDepth(2).setMask(gridMask);
+                const s = this.add.image(x, y, Phaser.Utils.Array.GetRandom(SYMBOL_KEYS)).setDisplaySize(LAYOUT.REEL_WIDTH-15, LAYOUT.SYMBOL_HEIGHT-15).setDepth(2).setMask(gridMask);
                 s.originalX = x; s.originalY = y; s.rowIndex = row; 
                 this.symbols[reel][row] = s;
             }
@@ -208,7 +211,7 @@ class GameScene extends Phaser.Scene {
         
         this.fetchSettings();
 
-        // 🔥 Fix 5: Sound Animation )))
+        // Sound Animation )))
         this.soundBtn = this.add.image(width-40, 80, 'sound_on').setDisplaySize(50, 50).setInteractive({useHandCursor:true});
         this.soundWaves = this.add.text(width-70, 80, ')))', {fontSize: '20px', fill: '#0F0'}).setOrigin(1, 0.5);
         
@@ -219,11 +222,16 @@ class GameScene extends Phaser.Scene {
             this.soundWaves.setVisible(this.soundEnabled);
         });
 
-        // Multiplier BG
+        // 🔥 Multiplier BG & Text Logic
         const multBG = this.add.graphics();
         multBG.fillStyle(0x000000, 0.6); 
         multBG.fillRect(width/2 - 150, 160, 300, 40);
-        MULTIPLIER_LEVELS.forEach((l, i) => this.add.text((width/2-120)+i*80, 180, `x${l}`, { font: 'bold 28px Arial', fill: '#888' }).setOrigin(0.5));
+        this.multTexts = [];
+        MULTIPLIER_LEVELS.forEach((l, i) => {
+            const t = this.add.text((width/2-120)+i*80, 180, `x${l}`, { font: 'bold 28px Arial', fill: '#555' }).setOrigin(0.5);
+            this.multTexts.push(t);
+        });
+        this.updateMultiplierUI(); // Initial state
 
         const uiY = height - 100; 
         this.spinButton = this.add.image(width/2, uiY, 'bet_button').setScale(0.08).setInteractive().setDepth(50);
@@ -254,12 +262,40 @@ class GameScene extends Phaser.Scene {
     
     refreshUserData() { 
         if(this.isSpinning) return; 
-        fetch(`/api/user-data?username=${this.currentUser.username}`).then(r=>r.json()).then(d=>{ if(d.success) { this.balance = d.balance; this.updateUI(); if(d.isBanned) location.reload(); } }); 
+        fetch(`/api/user-data?username=${this.currentUser.username}`).then(r=>r.json()).then(d=>{ 
+            if(d.success) { 
+                this.balance = d.balance; 
+                this.currentUser.myCode = d.myCode; // 🔥 Fix Ref Code Undefined
+                this.updateUI(); 
+                if(d.isBanned) location.reload(); 
+            } 
+        }); 
+    }
+
+    // 🔥 Fix: Multiplier Visual
+    updateMultiplierUI() {
+        this.multTexts.forEach((t, i) => {
+            if (i < this.winStreak) {
+                t.setFill('#FFD700'); // Highlight Gold
+                t.setFontSize(34);
+            } else {
+                t.setFill('#555'); // Dim
+                t.setFontSize(28);
+            }
+        });
     }
 
     getSpinResult() {
         const grid = Array.from({length:REEL_COUNT},()=>[]);
-        const isWin = (Phaser.Math.Between(1,100) <= this.currentWinRate); 
+        
+        // 🔥 Super Win Mode Logic (10 spins with 40% win rate)
+        let effectiveWinRate = this.currentWinRate;
+        if (this.superWinSpinsLeft > 0) {
+            effectiveWinRate = 40;
+            this.superWinSpinsLeft--;
+        }
+
+        const isWin = (Phaser.Math.Between(1,100) <= effectiveWinRate); 
         const winSym = isWin ? Phaser.Utils.Array.GetRandom(SYMBOL_KEYS) : null;
         const winRow = isWin ? Phaser.Math.Between(0, ROW_COUNT-1) : -1;
         const match = isWin ? Phaser.Math.Between(3, REEL_COUNT) : 0;
@@ -302,13 +338,14 @@ class GameScene extends Phaser.Scene {
                             targets: s, y: s.y - SYMBOL_SHIFT_COUNT*(LAYOUT.SYMBOL_HEIGHT+LAYOUT.GAP), duration: SPIN_DURATION_PER_REEL*(reel*1.5+4), ease: 'Quad.easeOut',
                             onUpdate: (t, tg) => { 
                                 if(Math.random()>0.5) tg.setTexture(Phaser.Utils.Array.GetRandom(SYMBOL_KEYS)); 
-                                tg.setDisplaySize(LAYOUT.REEL_WIDTH-20, LAYOUT.SYMBOL_HEIGHT-20);
+                                // 🔥 Tight Frame Size Fix
+                                tg.setDisplaySize(LAYOUT.REEL_WIDTH-15, LAYOUT.SYMBOL_HEIGHT-15);
                             },
                             onComplete: (t, tg) => {
                                 const trg = tg[0]; 
                                 trg.setTexture(result[reel][trg.rowIndex]); 
                                 trg.y = LAYOUT.START_Y + trg.rowIndex*(LAYOUT.SYMBOL_HEIGHT+LAYOUT.GAP);
-                                trg.setDisplaySize(LAYOUT.REEL_WIDTH-20, LAYOUT.SYMBOL_HEIGHT-20);
+                                trg.setDisplaySize(LAYOUT.REEL_WIDTH-15, LAYOUT.SYMBOL_HEIGHT-15);
                                 if(trg.rowIndex === ROW_COUNT-1) this.stopReel();
                             }
                         });
@@ -323,7 +360,6 @@ class GameScene extends Phaser.Scene {
         if (this.reelsStopped === REEL_COUNT) {
             this.isSpinning = false; 
             
-            // Sync Stop
             if(this.spinButtonTween) this.spinButtonTween.stop();
             this.spinButton.angle = 0;
 
@@ -331,12 +367,23 @@ class GameScene extends Phaser.Scene {
             const win = this.checkWin(grid);
             
             if (win > 0) {
+                // 🔥 Win Logic Update
+                this.winStreak++;
+                if (this.winStreak >= 4) { // Reached 5x (Index 3 is 5x)
+                    this.superWinSpinsLeft = 10; // Trigger Super Win Mode
+                    this.centerWinText.setText("SUPER WIN MODE!").setVisible(true);
+                }
+                this.updateMultiplierUI();
+
                 try { this.sound.play('win_sound'); } catch(e){}
                 this.showWinAnimation(win);
-                // 🔥 Fix 3: Golden Coin Rain
                 this.startCoinRain();
                 fetch('/api/update-balance', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({username:this.currentUser.username, amount: win}) })
                 .then(r=>r.json()).then(d => { this.balance = d.newBalance; this.updateUI(); });
+            } else {
+                // 🔥 Reset Streak on Loss
+                this.winStreak = 0;
+                this.updateMultiplierUI();
             }
         }
     }
@@ -345,13 +392,14 @@ class GameScene extends Phaser.Scene {
         const emitter = this.coinParticles.createEmitter({
             x: { min: 0, max: GAME_WIDTH },
             y: -50,
-            lifespan: 2000,
-            speedY: { min: 200, max: 400 },
-            scale: { start: 0.5, end: 0.5 },
-            quantity: 2,
-            frequency: 100
+            lifespan: 2500,
+            speedY: { min: 300, max: 600 },
+            scale: { start: 0.3, end: 0.3 }, // Smaller Coins
+            quantity: 4,
+            frequency: 50,
+            rotate: { min: 0, max: 360 }
         });
-        this.time.delayedCall(3000, () => emitter.stop());
+        this.time.delayedCall(4000, () => emitter.stop());
     }
 
     showWinAnimation(amount) {
@@ -365,7 +413,10 @@ class GameScene extends Phaser.Scene {
         for (let r=0; r<ROW_COUNT; r++) {
             let sym = grid[0][r], m = 1;
             for (let c=1; c<REEL_COUNT; c++) { if (grid[c][r] === sym) m++; else break; }
-            if (m >= 3) total += this.currentBet * SYMBOL_VALUES[sym] * (m-2);
+            if (m >= 3) {
+                let mult = MULTIPLIER_LEVELS[Math.min(this.winStreak, 3)]; // Apply multiplier
+                total += this.currentBet * SYMBOL_VALUES[sym] * (m-2) * mult;
+            }
         }
         return total;
     }
@@ -378,14 +429,14 @@ class GameScene extends Phaser.Scene {
         this.menuBalance = this.add.text(175, 120, `Bal: Tk ${this.balance.toFixed(2)}`, { fontSize: '20px', fill: '#FFF' }).setOrigin(0.5);
         c.add(this.menuBalance);
         
-        const refCode = this.add.text(175, 150, `Ref: ${this.currentUser.myCode}`, { fontSize: '18px', fill: '#0F0' }).setOrigin(0.5);
+        const refCode = this.add.text(175, 150, `Ref: ${this.currentUser.myCode || 'N/A'}`, { fontSize: '18px', fill: '#0F0' }).setOrigin(0.5);
         c.add(refCode);
 
         let y = 200;
         const btns = [
             {t: 'DEPOSIT', c: 0x00FF00, cb: ()=>this.showDepositPanel()},
             {t: 'WITHDRAW', c: 0xFFA500, cb: ()=>this.showWithdrawPanel()},
-            {t: 'HISTORY', c: 0x00AAFF, cb: ()=>this.showHistoryPanel()}, // Now shows bets
+            {t: 'HISTORY', c: 0x00AAFF, cb: ()=>this.showHistoryPanel()},
             {t: 'GAME RULES', c: 0xFFFFFF, cb: ()=>this.showRulesPanel()},
             {t: 'REFER & EARN', c: 0xE2136E, cb: ()=>this.showReferralInfo()}
         ];
@@ -404,41 +455,37 @@ class GameScene extends Phaser.Scene {
         const c = this.add.container(x, y, [bg, txt]);
         bg.on('pointerdown', () => { 
             this.tweens.add({targets:c, scale:0.9, yoyo:true, duration:50}); 
-            // 🔥 Fix 2: Auto Close Menu
+            // 🔥 Fix: Close menu THEN open panel
             this.toggleMenu(); 
-            this.time.delayedCall(200, cb); 
+            this.time.delayedCall(250, cb); 
         });
         return c;
     }
 
-    // --- NEW SYSTEM: DEPOSIT ---
+    // --- DEPOSIT SYSTEM FIX ---
     showDepositPanel() {
         const { width, height } = this.scale;
         const c = this.add.container(width/2, height/2).setDepth(300);
-        c.add(this.add.rectangle(0,0,width,height,0x000000,0.8)); // Dim BG
+        c.add(this.add.rectangle(0,0,width,height,0x000000,0.8));
         c.add(this.add.rectangle(0,0,480,500,0xFFFFFF).setStrokeStyle(4, 0x00FF00));
         c.add(this.add.text(0,-200,"DEPOSIT", {fontSize:'32px', fill:'#000', fontStyle:'bold'}).setOrigin(0.5));
 
-        // Input 1: Amount
         const amtInput = this.createInputBox(0, -100, "Enter Amount (min 50)", c);
-        // Input 2: Sender Number
         const phnInput = this.createInputBox(0, -20, "Sender Number", c);
 
-        // Buttons
         const b1 = this.add.text(0, 80, " bKash Payment ", {fontSize:'24px', backgroundColor:'#E2136E', padding:10}).setOrigin(0.5).setInteractive({useHandCursor:true});
         const b2 = this.add.text(0, 150, " Nagad Payment ", {fontSize:'24px', backgroundColor:'#F58220', padding:10}).setOrigin(0.5).setInteractive({useHandCursor:true});
 
-        b1.on('pointerdown', () => {
-            if(!amtInput.value || !phnInput.value) return alert("Enter Amount & Phone first!");
+        const validate = (method, color) => {
+            if(!amtInput.value || !phnInput.value) return alert("Fill all fields!");
+            // 🔥 Fix: 11 Digit Check
+            if(phnInput.value.length !== 11) return alert("Sender Number must be 11 digits!");
             c.destroy();
-            this.showPaymentPage(amtInput.value, 'bKash', phnInput.value, 0xE2136E);
-        });
+            this.showPaymentPage(amtInput.value, method, phnInput.value, color);
+        };
 
-        b2.on('pointerdown', () => {
-            if(!amtInput.value || !phnInput.value) return alert("Enter Amount & Phone first!");
-            c.destroy();
-            this.showPaymentPage(amtInput.value, 'Nagad', phnInput.value, 0xF58220);
-        });
+        b1.on('pointerdown', () => validate('bKash', 0xE2136E));
+        b2.on('pointerdown', () => validate('Nagad', 0xF58220));
 
         c.add([b1, b2]);
         this.addCloseButton(c, ()=>c.destroy(), 220);
@@ -465,7 +512,6 @@ class GameScene extends Phaser.Scene {
         c.add(this.add.text(0,-280, `${method} PAYMENT`, {fontSize:'30px', fill: color==0xE2136E?'#E2136E':'#F58220', fontStyle:'bold'}).setOrigin(0.5));
         c.add(this.add.text(0,-220, `Amount: Tk ${amount}`, {fontSize:'24px', fill:'#000'}).setOrigin(0.5));
 
-        // Rotate Number Logic (1 Hour = 3600000ms)
         const numList = method === 'bKash' ? PAYMENT_NUMBERS.bkash : PAYMENT_NUMBERS.nagad;
         const index = new Date().getHours() % numList.length;
         const targetNum = numList[index];
@@ -473,23 +519,25 @@ class GameScene extends Phaser.Scene {
         c.add(this.add.text(0, -150, "Send Money To:", {fontSize:'20px', fill:'#555'}).setOrigin(0.5));
         const numTxt = this.add.text(0, -110, targetNum, {fontSize:'35px', fill: color==0xE2136E?'#E2136E':'#F58220', fontStyle:'bold', backgroundColor:'#EEE'}).setOrigin(0.5);
         
-        // Copy Button
         const copyBtn = this.add.text(0, -60, " [ COPY NUMBER ] ", {fontSize:'18px', backgroundColor:'#000', fill:'#FFF'}).setOrigin(0.5).setInteractive({useHandCursor:true});
         copyBtn.on('pointerdown', () => {
             navigator.clipboard.writeText(targetNum);
             alert("Number Copied!");
         });
 
-        // Trx Input
         const trxInput = this.createInputBox(0, 50, "Enter TrxID", c);
         
         const subBtn = this.add.text(0, 150, " SUBMIT REQUEST ", {fontSize:'26px', backgroundColor:'#00AA00', padding:10}).setOrigin(0.5).setInteractive({useHandCursor:true});
         subBtn.on('pointerdown', () => {
             if(!trxInput.value) return alert("Please Enter TrxID!");
+            // 🔥 Fix: TrxID Validation & Uppercase
+            let finalTrx = trxInput.value.toUpperCase();
+            if(!/^[A-Z0-9]+$/.test(finalTrx)) return alert("Invalid TrxID! Use Letters and Numbers.");
+            
             fetch('/api/transaction', { 
                 method:'POST', 
                 headers:{'Content-Type':'application/json'}, 
-                body:JSON.stringify({ type:'Deposit', method, amount: parseFloat(amount), phone: sender, trx: trxInput.value, username:this.currentUser.username }) 
+                body:JSON.stringify({ type:'Deposit', method, amount: parseFloat(amount), phone: sender, trx: finalTrx, username:this.currentUser.username }) 
             })
             .then(r=>r.json()).then(d=>{ alert(d.message); c.destroy(); });
         });
@@ -498,14 +546,13 @@ class GameScene extends Phaser.Scene {
         this.addCloseButton(c, ()=>c.destroy(), 250);
     }
 
-    // --- ADMIN PANEL REWORK ---
+    // --- ADMIN PANEL ---
     showAdminDashboard() {
         const { width, height } = this.scale;
         const c = this.add.container(width/2, height/2).setDepth(500);
         c.add(this.add.rectangle(0, 0, 500, 800, 0x111111).setStrokeStyle(3, 0xFFD700));
         c.add(this.add.text(0, -360, "ADMIN CONTROL", { fontSize: '32px', fill: '#FFD700' }).setOrigin(0.5));
         
-        // Win Rate UI Fixed
         let y = -280;
         const rateTxt = this.add.text(0, y, `WIN RATE: ${this.currentWinRate}%`, {fontSize:'24px', fill:'#0F0'}).setOrigin(0.5);
         const btnMinus = this.add.text(-120, y, " [-] ", {fontSize:'24px', backgroundColor:'#F00'}).setOrigin(0.5).setInteractive({useHandCursor:true});
@@ -529,11 +576,10 @@ class GameScene extends Phaser.Scene {
             {t:'UPDATE NOTICE', cb:()=>{const n=prompt("Notice:");if(n)fetch('/api/admin/update-notice',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({notice:n})}).then(()=>alert("Done"));}}
         ];
         tools.forEach(t => { c.add(this.createGlossyBtn(0, y, t.t, 0xFFFFFF, t.cb)); y+=80; });
-        
         this.addCloseButton(c, ()=>c.destroy(), 350);
     }
 
-    showUserListPanel() {
+    showUserListPanel() { /* Same as before */ 
         const { width, height } = this.scale;
         const c = this.add.container(width/2, height/2).setDepth(600);
         c.add(this.add.rectangle(0, 0, 520, 800, 0x222222).setStrokeStyle(2, 0xFFD700));
@@ -551,7 +597,7 @@ class GameScene extends Phaser.Scene {
         });
     }
 
-    showUserDetails(username) {
+    showUserDetails(username) { /* Same as before */
         const { width, height } = this.scale;
         const c = this.add.container(width/2, height/2).setDepth(700);
         c.add(this.add.rectangle(0, 0, 500, 700, 0x000000).setStrokeStyle(3, 0x00AAFF));
@@ -562,21 +608,16 @@ class GameScene extends Phaser.Scene {
             const u = d.user;
             const info = `Mobile: ${u.mobile}\nBalance: ${u.balance}\nTotal Deposit: ${u.totalDeposit}\nTotal Withdraw: ${u.totalWithdraw}\nTotal Bet: ${u.totalBet}\nTotal Win: ${u.totalWin}\nStatus: ${u.isBanned ? 'BANNED' : 'ACTIVE'}`;
             c.add(this.add.text(0, -50, info, { fontSize: '20px', fill: '#FFF', align: 'center' }).setOrigin(0.5));
-            
             const banBtn = this.add.text(0, 200, u.isBanned ? " UNBAN USER " : " BAN USER ", { fontSize: '24px', backgroundColor: u.isBanned ? '#0A0' : '#F00', padding: 10 }).setOrigin(0.5).setInteractive({useHandCursor:true});
-            banBtn.on('pointerdown', () => {
-                fetch('/api/admin/ban-user', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ username: u.username, banStatus: !u.isBanned })})
-                .then(()=>{ alert("Status Updated"); c.destroy(); });
-            });
+            banBtn.on('pointerdown', () => { fetch('/api/admin/ban-user', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ username: u.username, banStatus: !u.isBanned })}).then(()=>{ alert("Status Updated"); c.destroy(); }); });
             c.add(banBtn);
         });
         this.addCloseButton(c, ()=>c.destroy(), 300);
     }
 
-    // --- OTHER HELPERS ---
-    showWithdrawPanel() { this.showPaymentModal('WITHDRAW', 0xE2136E, 0xF58220); } // Can be customized later
+    showWithdrawPanel() { this.showPaymentModal('WITHDRAW', 0xE2136E, 0xF58220); }
     
-    showAdminRequestsPanel(type) { /* Same as before, code preserved in server but short for brevity */
+    showAdminRequestsPanel(type) {
         const { width, height } = this.scale;
         const c = this.add.container(width/2, height/2).setDepth(500);
         c.add(this.add.rectangle(0, 0, 520, 800, 0x222222).setStrokeStyle(2, 0xFFD700));
@@ -603,7 +644,6 @@ class GameScene extends Phaser.Scene {
         c.add(this.add.rectangle(0,0,480,700,0x111111).setStrokeStyle(2,0xFFFFFF));
         c.add(this.add.text(0,-320,"BETTING HISTORY", {fontSize:'28px',fill:'#FFF'}).setOrigin(0.5));
         this.addCloseButton(c, ()=>c.destroy(), 320);
-
         fetch(`/api/history?username=${this.currentUser.username}`).then(r=>r.json()).then(d => {
             let y=-250;
             d.forEach(h=>{

@@ -43,12 +43,11 @@ const TransactionSchema = new mongoose.Schema({
 });
 const Transaction = mongoose.model('Transaction', TransactionSchema);
 
-// 🔥 New: Bet History Schema (For User History)
 const BetHistorySchema = new mongoose.Schema({
     username: { type: String },
     betAmount: { type: Number },
     winAmount: { type: Number },
-    result: { type: String }, // "WIN" or "LOSS"
+    result: { type: String },
     date: { type: Date, default: Date.now }
 });
 const BetHistory = mongoose.model('BetHistory', BetHistorySchema);
@@ -60,7 +59,6 @@ const SettingsSchema = new mongoose.Schema({
 });
 const Settings = mongoose.model('Settings', SettingsSchema);
 
-// Admin Init
 async function initAdmin() {
     const adminExists = await User.findOne({ username: 'admin' });
     if (!adminExists) {
@@ -104,7 +102,6 @@ app.post('/api/login', async (req, res) => {
     } catch (err) { res.status(500).json({ success: false }); }
 });
 
-// 🔥 Updated Register: Unique Code Generator
 app.post('/api/register', async (req, res) => {
     const { mobile, username, password, refCode } = req.body;
     try {
@@ -114,7 +111,6 @@ app.post('/api/register', async (req, res) => {
         const salt = await bcrypt.genSalt(10);
         const hashedPassword = await bcrypt.hash(password, salt);
         
-        // Generate Code: 3 letters of name + Random 3 chars (e.g., TOH8x2)
         const randomStr = Math.random().toString(36).substring(2, 5).toUpperCase();
         const namePart = username.substring(0, 3).toUpperCase();
         const myCode = `${namePart}${randomStr}`;
@@ -138,6 +134,7 @@ app.post('/api/register', async (req, res) => {
     } catch (err) { res.status(500).json({ success: false, message: 'Error' }); }
 });
 
+// 🔥 Fix: Return ownReferralCode clearly
 app.get('/api/user-data', async (req, res) => {
     try {
         const user = await User.findOne({ username: req.query.username });
@@ -146,13 +143,11 @@ app.get('/api/user-data', async (req, res) => {
     } catch { res.json({ success: false }); }
 });
 
-// 🔥 Admin: Get Full User Details
 app.get('/api/admin/user-details', async (req, res) => {
     try {
         const user = await User.findOne({ username: req.query.username });
         if (!user) return res.json({ success: false });
         
-        // Get Stats
         const deposits = await Transaction.aggregate([{ $match: { username: user.username, type: 'Deposit', status: 'Success' } }, { $group: { _id: null, total: { $sum: "$amount" } } }]);
         const withdraws = await Transaction.aggregate([{ $match: { username: user.username, type: 'Withdraw', status: 'Success' } }, { $group: { _id: null, total: { $sum: "$amount" } } }]);
         
@@ -167,8 +162,7 @@ app.get('/api/admin/user-details', async (req, res) => {
                 totalWithdraw: withdraws[0]?.total || 0,
                 totalBet: user.totalBet,
                 totalWin: user.totalWin,
-                // Security Warning: Sending hashed password only for checking presence, normally shouldn't allow decrypt
-                passwordHash: "Encrypted" 
+                ownReferralCode: user.ownReferralCode
             }
         });
     } catch { res.json({ success: false }); }
@@ -199,14 +193,12 @@ app.post('/api/update-balance', async (req, res) => {
         const user = await User.findOne({ username });
         if (user) {
             user.balance += amount;
-            // Stat update
             if(amount < 0) user.totalBet += Math.abs(amount);
             if(amount > 0) user.totalWin += amount;
             
             user.balance = parseFloat(user.balance.toFixed(2));
             await user.save();
 
-            // Log Bet History
             await new BetHistory({
                 username,
                 betAmount: amount < 0 ? Math.abs(amount) : 0,
@@ -248,8 +240,6 @@ app.post('/api/admin/action', async (req, res) => {
 app.get('/api/admin/transactions', async (req, res) => { try { const t = await Transaction.find().sort({ date: -1 }).limit(100); res.json(t); } catch { res.json([]); } });
 app.get('/api/admin/users', async (req, res) => { try { const u = await User.find({}, 'username mobile balance isBanned').sort({ _id: -1 }); res.json(u); } catch { res.json([]); } });
 app.post('/api/admin/ban-user', async (req, res) => { try { await User.updateOne({ username: req.body.username }, { isBanned: req.body.banStatus }); res.json({ success: true }); } catch { res.json({ success: false }); } });
-
-// 🔥 User Bet History
 app.get('/api/history', async (req, res) => { 
     try { 
         const h = await BetHistory.find({ username: req.query.username }).sort({ date: -1 }).limit(30); 
