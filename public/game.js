@@ -34,24 +34,19 @@ class PreloadScene extends Phaser.Scene {
     constructor() { super('PreloadScene'); }
     preload() {
         const { width, height } = this.scale;
-        
         const progressBar = this.add.graphics();
         const progressBox = this.add.graphics();
         progressBox.fillStyle(0x222222, 0.8);
         progressBox.fillRect(width/2 - 150, height/2, 300, 40);
         const percentText = this.add.text(width/2, height/2 + 20, '0%', { font: '18px Arial', fill: '#ffffff' }).setOrigin(0.5);
-
         this.load.path = 'assets/'; 
-
         this.load.on('progress', (value) => {
             percentText.setText(parseInt(value * 100) + '%');
             progressBar.clear();
             progressBar.fillStyle(0xFFD700, 1);
             progressBar.fillRect(width/2 - 140, height/2 + 10, 280 * value, 20);
         });
-
         this.load.on('complete', () => { this.scene.start('LoginScene'); });
-
         this.load.image('background', 'new_background.jpg'); 
         this.load.image('reel_frame_img', 'reel_frame.png'); 
         this.load.image('golden_frame', 'golden_frame.png'); 
@@ -83,23 +78,14 @@ class LoginScene extends Phaser.Scene {
         const { width, height } = this.scale;
         this.add.image(width/2, height/2, 'background').setDisplaySize(width, height);
         this.add.text(width/2, 100, 'SuperAce Casino', { font: 'bold 45px Arial', fill: '#FFD700', stroke: '#000', strokeThickness: 6 }).setOrigin(0.5); 
-
         const boxY = height/2 + 40;
         this.add.rectangle(width/2, boxY, 480, 650, 0x000000, 0.7).setStrokeStyle(3, 0xFFD700);
-
         const urlParams = new URLSearchParams(window.location.search);
         const refParam = urlParams.get('ref');
         if(refParam) this.refCode = refParam;
-
         this.loginContainer = this.createLoginUI(width, boxY);
         this.regContainer = this.createRegistrationUI(width, boxY);
-        
-        if(refParam) {
-            this.loginContainer.setVisible(false);
-            this.regContainer.setVisible(true);
-        } else {
-            this.regContainer.setVisible(false);
-        }
+        if(refParam) { this.loginContainer.setVisible(false); this.regContainer.setVisible(true); } else { this.regContainer.setVisible(false); }
     }
 
     createInputField(x, y, p, n, isP, defaultVal = '') { 
@@ -171,7 +157,7 @@ class LoginScene extends Phaser.Scene {
 class GameScene extends Phaser.Scene {
     constructor() {
         super('GameScene');
-        window.gameScene = this; // 🔥 Global Access
+        window.gameScene = this; 
         this.currentUser = null;
         this.soundEnabled = true;
         this.currentWinRate = 30;
@@ -192,20 +178,17 @@ class GameScene extends Phaser.Scene {
         this.isSpinning = false; this.currentBet = 10.00; this.reelsStopped = 0;
         const { width, height } = this.scale;
         
+        // 1. Background (Depth 0)
         this.add.image(width/2, height/2, 'background').setDisplaySize(width, height).setDepth(0);
-        this.coinParticles = this.add.particles('coin');
-        this.coinParticles.setDepth(1); 
 
+        // 2. Reel Frame - BIG FRAME (Depth 1 - Bottom of game elements)
+        const frameCenterY = LAYOUT.START_Y + ((ROW_COUNT-1)*(LAYOUT.SYMBOL_HEIGHT+LAYOUT.GAP))/2;
+        this.add.image(width/2, frameCenterY, 'reel_frame_img').setDisplaySize(TOTAL_GRID_WIDTH+30, (LAYOUT.SYMBOL_HEIGHT*ROW_COUNT)+40).setDepth(1); 
+
+        // 3. Golden Frame (Depth 2 - Middle)
+        // 4. Symbols (Depth 3 - Top)
         const maskShape = this.make.graphics().fillStyle(0xffffff).fillRect(START_X-LAYOUT.REEL_WIDTH/2-5, LAYOUT.START_Y-LAYOUT.SYMBOL_HEIGHT/2-5, TOTAL_GRID_WIDTH+10, (LAYOUT.SYMBOL_HEIGHT*ROW_COUNT)+(LAYOUT.GAP*ROW_COUNT)+20);
         const gridMask = maskShape.createGeometryMask();
-        
-        // 🔥 Layering Fixed
-        // 5 = Reel Frame (Topmost)
-        // 4 = Symbols
-        // 3 = Golden Frame (Bottom)
-        
-        const frameCenterY = LAYOUT.START_Y + ((ROW_COUNT-1)*(LAYOUT.SYMBOL_HEIGHT+LAYOUT.GAP))/2;
-        this.add.image(width/2, frameCenterY, 'reel_frame_img').setDisplaySize(TOTAL_GRID_WIDTH+30, (LAYOUT.SYMBOL_HEIGHT*ROW_COUNT)+40).setDepth(5); 
         
         this.symbols = [];
         for (let reel=0; reel<REEL_COUNT; reel++) {
@@ -214,21 +197,29 @@ class GameScene extends Phaser.Scene {
                 const x = START_X + reel*(LAYOUT.REEL_WIDTH+LAYOUT.GAP); 
                 const y = LAYOUT.START_Y + row*(LAYOUT.SYMBOL_HEIGHT+LAYOUT.GAP); 
                 
-                this.add.image(x, y, 'golden_frame').setDisplaySize(LAYOUT.REEL_WIDTH, LAYOUT.SYMBOL_HEIGHT).setDepth(3); 
+                // Golden Frame (Middle)
+                this.add.image(x, y, 'golden_frame').setDisplaySize(LAYOUT.REEL_WIDTH, LAYOUT.SYMBOL_HEIGHT).setDepth(2); 
                 
-                const s = this.add.image(x, y, Phaser.Utils.Array.GetRandom(SYMBOL_KEYS)).setDisplaySize(LAYOUT.REEL_WIDTH-15, LAYOUT.SYMBOL_HEIGHT-15).setDepth(4).setMask(gridMask);
+                // Symbol (Top)
+                const s = this.add.image(x, y, Phaser.Utils.Array.GetRandom(SYMBOL_KEYS)).setDisplaySize(LAYOUT.REEL_WIDTH-15, LAYOUT.SYMBOL_HEIGHT-15).setDepth(3).setMask(gridMask);
                 
                 s.originalX = x; s.originalY = y; s.rowIndex = row; 
                 this.symbols[reel][row] = s;
             }
         }
 
+        // 5. Coin Particles (Depth 4 - Over symbols)
+        this.coinParticles = this.add.particles('coin');
+        this.coinParticles.setDepth(4); 
+
+        // UI Layer (Depth 50+)
         this.add.text(width/2, 80, 'SuperAce', { font: 'bold 48px Arial', fill: '#FFD700', stroke: '#000', strokeThickness: 4 }).setOrigin(0.5).setDepth(50); 
         this.noticeLabel = this.add.text(width, 140, "Welcome!", { font: '20px Arial', fill: '#0F0', backgroundColor: '#000' }).setOrigin(0, 0.5).setDepth(50);
         this.tweens.add({ targets: this.noticeLabel, x: -600, duration: 12000, repeat: -1 });
         
         this.fetchSettings();
 
+        // Sound Button
         this.soundBtn = this.add.image(width-40, 80, 'sound_on').setDisplaySize(50, 50).setInteractive({useHandCursor:true}).setDepth(50);
         this.soundWaves = this.add.text(width-70, 80, ')))', {fontSize: '20px', fill: '#0F0'}).setOrigin(1, 0.5).setDepth(50);
         this.soundBtn.on('pointerdown', () => { 
@@ -255,6 +246,7 @@ class GameScene extends Phaser.Scene {
         this.add.text(width/2, uiY, 'SPIN', { font: 'bold 18px Arial', fill: '#FFD700' }).setOrigin(0.5).setDepth(53);
 
         this.add.image(width-80, uiY-60, 'plus_button').setScale(0.35).setInteractive().setDepth(52).on('pointerdown', () => this.adjustBet(1));
+        // 🔥 Minus Button Bigger (0.45)
         this.add.image(width-80, uiY+60, 'minus_button').setScale(0.45).setInteractive().setDepth(52).on('pointerdown', () => this.adjustBet(-1));
         
         this.betAdjustText = this.add.text(width-80, uiY+5, `Tk ${this.currentBet}`, { fontSize: '24px', fill: '#FFF' }).setOrigin(0.5).setDepth(52);
