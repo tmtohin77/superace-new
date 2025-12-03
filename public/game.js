@@ -34,24 +34,19 @@ class PreloadScene extends Phaser.Scene {
     constructor() { super('PreloadScene'); }
     preload() {
         const { width, height } = this.scale;
-        
         const progressBar = this.add.graphics();
         const progressBox = this.add.graphics();
         progressBox.fillStyle(0x222222, 0.8);
         progressBox.fillRect(width/2 - 150, height/2, 300, 40);
         const percentText = this.add.text(width/2, height/2 + 20, '0%', { font: '18px Arial', fill: '#ffffff' }).setOrigin(0.5);
-
         this.load.path = 'assets/'; 
-
         this.load.on('progress', (value) => {
             percentText.setText(parseInt(value * 100) + '%');
             progressBar.clear();
             progressBar.fillStyle(0xFFD700, 1);
             progressBar.fillRect(width/2 - 140, height/2 + 10, 280 * value, 20);
         });
-
         this.load.on('complete', () => { this.scene.start('LoginScene'); });
-
         this.load.image('background', 'new_background.jpg'); 
         this.load.image('reel_frame_img', 'reel_frame.png'); 
         this.load.image('golden_frame', 'golden_frame.png'); 
@@ -74,7 +69,7 @@ class PreloadScene extends Phaser.Scene {
 }
 
 // =======================================================
-// Scene 1: Login (Auto Refer Logic Added)
+// Scene 1: Login
 // =======================================================
 class LoginScene extends Phaser.Scene {
     constructor() { super('LoginScene'); this.username = ''; this.password = ''; this.mobile = ''; this.newUsername = ''; this.newPassword = ''; this.refCode = ''; }
@@ -83,33 +78,20 @@ class LoginScene extends Phaser.Scene {
         const { width, height } = this.scale;
         this.add.image(width/2, height/2, 'background').setDisplaySize(width, height);
         this.add.text(width/2, 100, 'SuperAce Casino', { font: 'bold 45px Arial', fill: '#FFD700', stroke: '#000', strokeThickness: 6 }).setOrigin(0.5); 
-
         const boxY = height/2 + 40;
         this.add.rectangle(width/2, boxY, 480, 650, 0x000000, 0.7).setStrokeStyle(3, 0xFFD700);
-
-        // 🔥 Auto Fill Referral Code from URL
         const urlParams = new URLSearchParams(window.location.search);
         const refParam = urlParams.get('ref');
         if(refParam) this.refCode = refParam;
-
         this.loginContainer = this.createLoginUI(width, boxY);
         this.regContainer = this.createRegistrationUI(width, boxY);
-        
-        // If ref link used, show register page first
-        if(refParam) {
-            this.loginContainer.setVisible(false);
-            this.regContainer.setVisible(true);
-        } else {
-            this.regContainer.setVisible(false);
-        }
+        if(refParam) { this.loginContainer.setVisible(false); this.regContainer.setVisible(true); } else { this.regContainer.setVisible(false); }
     }
 
     createInputField(x, y, p, n, isP, defaultVal = '') { 
         const bg = this.add.rectangle(x, y, 350, 55, 0xFFFFFF).setStrokeStyle(2, 0x555555).setInteractive({ useHandCursor: true });
-        // Use default value if exists (for ref code)
         const displayTxt = defaultVal ? defaultVal : p;
         const txt = this.add.text(x-160, y, displayTxt, { fontSize: '20px', fill: defaultVal ? '#000' : '#555', fontStyle: 'bold' }).setOrigin(0, 0.5);
-        
         bg.on('pointerdown', () => {
             let v = prompt(`${p}:`, this[n] || '');
             if (v !== null) { this[n] = v; txt.setText(v ? (isP ? '•'.repeat(v.length) : v) : p).setFill(v ? '#000' : '#555'); }
@@ -148,7 +130,6 @@ class LoginScene extends Phaser.Scene {
         c.add(this.createInputField(w/2, startY + 70, 'Mobile Number', 'mobile', false));
         c.add(this.createInputField(w/2, startY + 140, 'Username', 'newUsername', false));
         c.add(this.createInputField(w/2, startY + 210, 'Password', 'newPassword', true));
-        // 🔥 Pre-fill ref code if available
         c.add(this.createInputField(w/2, startY + 280, 'Referral Code (Opt)', 'refCode', false, this.refCode));
         c.add(this.createBtn(w/2, startY + 370, 'REGISTER', 0x00AA00, '#FFF', this.handleRegistration.bind(this)));
         const back = this.add.text(w/2, startY + 450, '<< Back to Login', { fontSize: '22px', fill: '#FFD700', fontStyle: 'bold' }).setOrigin(0.5).setInteractive({useHandCursor:true});
@@ -181,6 +162,7 @@ class GameScene extends Phaser.Scene {
         this.currentWinRate = 30;
         this.winStreak = 0; 
         this.superWinSpinsLeft = 0; 
+        this.activePanel = null; // 🔥 Track Open Panel to Auto Close
     }
     
     init(data) {
@@ -195,22 +177,14 @@ class GameScene extends Phaser.Scene {
         this.isSpinning = false; this.currentBet = 10.00; this.reelsStopped = 0;
         const { width, height } = this.scale;
         
-        // 1. Background (Depth 0)
         this.add.image(width/2, height/2, 'background').setDisplaySize(width, height).setDepth(0);
-
         this.coinParticles = this.add.particles('coin');
         this.coinParticles.setDepth(1); 
 
         const maskShape = this.make.graphics().fillStyle(0xffffff).fillRect(START_X-LAYOUT.REEL_WIDTH/2-5, LAYOUT.START_Y-LAYOUT.SYMBOL_HEIGHT/2-5, TOTAL_GRID_WIDTH+10, (LAYOUT.SYMBOL_HEIGHT*ROW_COUNT)+(LAYOUT.GAP*ROW_COUNT)+20);
         const gridMask = maskShape.createGeometryMask();
         
-        // 🔥 Fix 1: Layering Fixed (Frame at Bottom, Symbol at Top)
-        // Depth 2 = Reel Frame (Big) - Now at bottom
-        // Depth 3 = Golden Frame (Small) - Middle
-        // Depth 4 = Symbols - Top
-        
         const frameCenterY = LAYOUT.START_Y + ((ROW_COUNT-1)*(LAYOUT.SYMBOL_HEIGHT+LAYOUT.GAP))/2;
-        // Big Frame is now BEHIND (Depth 2)
         this.add.image(width/2, frameCenterY, 'reel_frame_img').setDisplaySize(TOTAL_GRID_WIDTH+30, (LAYOUT.SYMBOL_HEIGHT*ROW_COUNT)+40).setDepth(2); 
         
         this.symbols = [];
@@ -219,13 +193,8 @@ class GameScene extends Phaser.Scene {
             for (let row=0; row<ROW_COUNT; row++) {
                 const x = START_X + reel*(LAYOUT.REEL_WIDTH+LAYOUT.GAP); 
                 const y = LAYOUT.START_Y + row*(LAYOUT.SYMBOL_HEIGHT+LAYOUT.GAP); 
-                
-                // Individual Frame (Depth 3)
                 this.add.image(x, y, 'golden_frame').setDisplaySize(LAYOUT.REEL_WIDTH, LAYOUT.SYMBOL_HEIGHT).setDepth(3); 
-                
-                // Symbol (Depth 4 - On Top)
                 const s = this.add.image(x, y, Phaser.Utils.Array.GetRandom(SYMBOL_KEYS)).setDisplaySize(LAYOUT.REEL_WIDTH-15, LAYOUT.SYMBOL_HEIGHT-15).setDepth(4).setMask(gridMask);
-                
                 s.originalX = x; s.originalY = y; s.rowIndex = row; 
                 this.symbols[reel][row] = s;
             }
@@ -237,10 +206,8 @@ class GameScene extends Phaser.Scene {
         
         this.fetchSettings();
 
-        // Sound Button
         this.soundBtn = this.add.image(width-40, 80, 'sound_on').setDisplaySize(50, 50).setInteractive({useHandCursor:true}).setDepth(50);
         this.soundWaves = this.add.text(width-70, 80, ')))', {fontSize: '20px', fill: '#0F0'}).setOrigin(1, 0.5).setDepth(50);
-        
         this.soundBtn.on('pointerdown', () => { 
             this.soundEnabled = !this.soundEnabled; 
             this.sound.mute = !this.soundEnabled; 
@@ -264,7 +231,6 @@ class GameScene extends Phaser.Scene {
         this.spinButton.on('pointerdown', this.startSpin, this);
         this.add.text(width/2, uiY, 'SPIN', { font: 'bold 18px Arial', fill: '#FFD700' }).setOrigin(0.5).setDepth(53);
 
-        // 🔥 Fix 2: Minus Button Size Increased (0.45)
         this.add.image(width-80, uiY-60, 'plus_button').setScale(0.35).setInteractive().setDepth(52).on('pointerdown', () => this.adjustBet(1));
         this.add.image(width-80, uiY+60, 'minus_button').setScale(0.45).setInteractive().setDepth(52).on('pointerdown', () => this.adjustBet(-1));
         
@@ -314,16 +280,11 @@ class GameScene extends Phaser.Scene {
     getSpinResult() {
         const grid = Array.from({length:REEL_COUNT},()=>[]);
         let effectiveWinRate = this.currentWinRate;
-        if (this.superWinSpinsLeft > 0) {
-            effectiveWinRate = 40;
-            this.superWinSpinsLeft--;
-        }
-
+        if (this.superWinSpinsLeft > 0) { effectiveWinRate = 40; this.superWinSpinsLeft--; }
         const isWin = (Phaser.Math.Between(1,100) <= effectiveWinRate); 
         const winSym = isWin ? Phaser.Utils.Array.GetRandom(SYMBOL_KEYS) : null;
         const winRow = isWin ? Phaser.Math.Between(0, ROW_COUNT-1) : -1;
         const match = isWin ? Phaser.Math.Between(3, REEL_COUNT) : 0;
-        
         for (let c=0; c<REEL_COUNT; c++) {
             for (let r=0; r<ROW_COUNT; r++) {
                 if (isWin && r===winRow && c < match) grid[c][r] = winSym;
@@ -351,10 +312,8 @@ class GameScene extends Phaser.Scene {
                 this.balance = d.newBalance; 
                 this.updateUI();
                 try { this.sound.play('spin_start'); } catch(e){} 
-                
                 const result = this.getSpinResult();
                 this.reelsStopped = 0;
-                
                 for (let reel=0; reel<REEL_COUNT; reel++) {
                     for (let row=0; row<ROW_COUNT; row++) {
                         const s = this.symbols[reel][row];
@@ -382,26 +341,17 @@ class GameScene extends Phaser.Scene {
         this.reelsStopped++; try { this.sound.play('reel_stop'); } catch(e){}
         if (this.reelsStopped === REEL_COUNT) {
             this.isSpinning = false; 
-            
             if(this.spinButtonTween) this.spinButtonTween.stop();
             this.spinButton.angle = 0;
-
             const grid = this.symbols.map(r => r.map(s => s.texture.key));
             const win = this.checkWin(grid);
-            
             if (win > 0) {
                 this.winStreak++;
-                if (this.winStreak >= 4) { 
-                    this.superWinSpinsLeft = 10; 
-                    this.centerWinText.setText("SUPER WIN MODE!").setVisible(true);
-                }
+                if (this.winStreak >= 4) { this.superWinSpinsLeft = 10; this.centerWinText.setText("SUPER WIN MODE!").setVisible(true); }
                 this.updateMultiplierUI();
-
                 try { this.sound.play('win_sound'); } catch(e){}
                 this.showWinAnimation(win);
-                
                 if(win > this.currentBet * 5) this.startCoinRain();
-                
                 fetch('/api/update-balance', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({username:this.currentUser.username, amount: win}) })
                 .then(r=>r.json()).then(d => { this.balance = d.newBalance; this.updateUI(); });
             } else {
@@ -444,43 +394,188 @@ class GameScene extends Phaser.Scene {
         return total;
     }
 
-    // --- 🔥 FIX 3: SHARE PANEL (HTML Overlay) ---
+    // --- 🔥 FIX 1: Auto Close Previous Panel ---
+    closeActivePanel() {
+        if(this.activePanel) {
+            // If it's a DOM element (share panel/history)
+            if(this.activePanel.tagName) {
+                document.body.removeChild(this.activePanel);
+            } else {
+                // If it's a Phaser container
+                this.activePanel.destroy();
+            }
+            this.activePanel = null;
+        }
+    }
+
+    // --- 🔥 FIX 2: Create HTML Scroll Panel (Unlimited Scroll) ---
+    createHTMLScrollPanel(title, dataList, onClose) {
+        this.closeActivePanel(); // Auto close previous
+
+        const div = document.createElement('div');
+        div.style = "position:absolute; top:50%; left:50%; transform:translate(-50%, -50%); width:350px; height:500px; background:black; border:3px solid gold; overflow-y:auto; padding:15px; color:white; font-family:arial; z-index:1000; text-align:center; border-radius:10px; box-shadow: 0 0 20px black;";
+        this.activePanel = div; // Set as active
+
+        // Title and Close Button Header
+        const header = document.createElement('div');
+        header.style = "display:flex; justify-content:space-between; align-items:center; border-bottom: 1px solid #555; padding-bottom:10px; margin-bottom:10px;";
+        
+        const h2 = document.createElement('h3');
+        h2.innerText = title;
+        h2.style = "color: gold; margin:0;";
+        
+        // 🔥 Fix: Top Right Close [X] Button
+        const closeBtn = document.createElement('button');
+        closeBtn.innerText = " X ";
+        closeBtn.style = "background:red; color:white; border:none; padding:5px 10px; font-size:20px; font-weight:bold; cursor:pointer; border-radius:5px;";
+        closeBtn.onclick = () => { document.body.removeChild(div); this.activePanel = null; onClose(); };
+        
+        header.appendChild(h2);
+        header.appendChild(closeBtn);
+        div.appendChild(header);
+
+        // Content List
+        const contentDiv = document.createElement('div');
+        if(dataList.length === 0) {
+            contentDiv.innerHTML = "<p style='color:#888'>No Records Found</p>";
+        } else {
+            dataList.forEach(item => {
+                const p = document.createElement('div');
+                p.style = `border-bottom:1px solid #333; padding:10px; margin:0; text-align:left; color:${item.color || 'white'}`;
+                // 🔥 Allow HTML in content for buttons
+                p.innerHTML = item.html || item.text;
+                contentDiv.appendChild(p);
+            });
+        }
+        div.appendChild(contentDiv);
+
+        document.body.appendChild(div);
+    }
+
+    showTransactionHistory(type) {
+        fetch(`/api/user-transactions?username=${this.currentUser.username}&type=${type}`)
+        .then(r=>r.json()).then(data => {
+            const list = data.map(t => ({
+                text: `${new Date(t.date).toLocaleDateString()} | Tk ${t.amount} | ${t.status}`,
+                color: t.status === 'Success' ? '#0F0' : (t.status === 'Pending' ? '#FF0' : '#F00')
+            }));
+            this.createHTMLScrollPanel(`${type.toUpperCase()} HISTORY`, list, () => {});
+        });
+    }
+
+    // --- 🔥 FIX: User List with Scroll & Details ---
+    showUserListPanel() {
+        this.closeActivePanel();
+        fetch('/api/admin/users').then(r=>r.json()).then(users => {
+            const list = users.map(u => ({
+                html: `<div style="display:flex; justify-content:space-between;">
+                        <span>${u.username} | Tk ${u.balance}</span>
+                        <button onclick="window.gameScene.showUserDetails('${u.username}')" style="background:blue; color:white; border:none; padding:5px; cursor:pointer;">DETAILS</button>
+                       </div>`
+            }));
+            this.createHTMLScrollPanel("USER MANAGEMENT", list, () => {});
+        });
+    }
+
+    showUserDetails(username) {
+        // 🔥 Fix: Close list, open details
+        this.closeActivePanel();
+        
+        fetch(`/api/admin/user-details?username=${username}`).then(r=>r.json()).then(d => {
+            if(!d.success) return alert("Error");
+            const u = d.user;
+            const statusColor = u.isBanned ? 'red' : 'green';
+            const statusText = u.isBanned ? 'INACTIVE (BANNED)' : 'ACTIVE';
+            
+            // Show password hash snippet (for security verification)
+            const passDisplay = u.passwordHash ? u.passwordHash.substring(0, 10) + "..." : "N/A";
+
+            const details = [
+                { text: `Mobile: ${u.mobile}` },
+                { text: `Balance: ${u.balance}` },
+                { text: `Password (Hash): ${passDisplay}` }, // 🔥 Show Password Hash
+                { text: `Status: ${statusText}`, color: statusColor }, // 🔥 Show Status
+                { text: `Total Deposit: ${u.totalDeposit}` },
+                { text: `Total Withdraw: ${u.totalWithdraw}` },
+                { text: `Total Bet: ${u.totalBet}` },
+                { text: `Total Win: ${u.totalWin}` }
+            ];
+
+            // Action Button
+            const btnHtml = `<button id="banBtn" style="width:100%; padding:10px; margin-top:10px; background:${u.isBanned?'green':'red'}; color:white; border:none; font-weight:bold; font-size:18px;">${u.isBanned?'UNBAN USER':'BAN USER'}</button>`;
+            
+            this.createHTMLScrollPanel(`USER: ${username}`, details, () => {});
+            
+            // Append Button manually
+            const div = this.activePanel;
+            const btnContainer = document.createElement('div');
+            btnContainer.innerHTML = btnHtml;
+            div.appendChild(btnContainer);
+
+            document.getElementById('banBtn').onclick = () => {
+                fetch('/api/admin/ban-user', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ username: u.username, banStatus: !u.isBanned })})
+                .then(()=>{ alert("Status Updated"); this.showUserDetails(username); });
+            };
+        });
+    }
+
+    // --- 🔥 FIX: Deposit/Withdraw Requests with Scroll ---
+    showAdminRequestsPanel(type) {
+        this.closeActivePanel();
+        fetch('/api/admin/transactions').then(r=>r.json()).then(data => {
+            const list = data.filter(t => t.status === 'Pending' && t.type === type);
+            if(list.length === 0) return this.createHTMLScrollPanel(`${type} REQUESTS`, [], ()=>{});
+
+            const formattedList = list.map(req => ({
+                html: `<div style="background:#222; padding:10px; margin-bottom:5px; border-radius:5px;">
+                        <div>${req.username} | Tk ${req.amount}</div>
+                        <div style="font-size:12px; color:#AAA;">${req.method} | ${req.phone} | Trx: ${req.trx}</div>
+                        <div style="margin-top:5px; display:flex; justify-content:space-between;">
+                            <button onclick="window.gameScene.handleAdminAction('${req.trx||req.phone}', 'approve', '${req.type}', ${req.amount}, '${req.username}')" style="background:green; color:white; border:none; padding:5px 15px; cursor:pointer;">✔ APPROVE</button>
+                            <button onclick="window.gameScene.handleAdminAction('${req.trx||req.phone}', 'reject', '${req.type}', ${req.amount}, '${req.username}')" style="background:red; color:white; border:none; padding:5px 15px; cursor:pointer;">X REJECT</button>
+                        </div>
+                       </div>`
+            }));
+            this.createHTMLScrollPanel(`${type} REQUESTS`, formattedList, ()=>{});
+        });
+    }
+
+    handleAdminAction(id, action, type, amount, username) { 
+        fetch('/api/admin/action', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ trxId: id, action, type, amount, username }) })
+        .then(() => { alert("Action Taken"); this.showAdminRequestsPanel(type); }); 
+    }
+
+    // --- OTHER PANELS ---
     showSharePanel() {
+        this.closeActivePanel();
         const code = this.currentUser.myCode || "LOADING";
         const link = `https://superace-new.onrender.com/?ref=${code}`;
-        const msg = `Join SuperAce Casino and get 200 Tk Bonus! Use my code: ${code} \nLink: ${link}`;
+        const msg = `Join SuperAce Casino! Code: ${code} \nLink: ${link}`;
 
         const div = document.createElement('div');
         div.style = "position:absolute; top:50%; left:50%; transform:translate(-50%, -50%); width:320px; background:#111; border:2px solid gold; padding:20px; color:white; font-family:arial; text-align:center; border-radius:10px; z-index:9999;";
-        
+        this.activePanel = div;
+
         div.innerHTML = `
-            <h2 style="color:gold; margin-top:0;">REFER & EARN</h2>
-            <p style="color:#AAA;">Share this link to earn commission!</p>
-            <div style="background:#333; padding:10px; border-radius:5px; word-break:break-all; margin-bottom:10px; border:1px solid #555;">
-                ${link}
+            <div style="display:flex; justify-content:space-between; margin-bottom:10px;">
+                <h3 style="color:gold; margin:0;">REFER & EARN</h3>
+                <button onclick="document.body.removeChild(this.parentElement.parentElement); window.gameScene.activePanel=null;" style="background:red; color:white; border:none; padding:5px 10px; font-weight:bold;">X</button>
             </div>
+            <p style="color:#AAA;">Share link to earn!</p>
+            <div style="background:#333; padding:10px; border-radius:5px; word-break:break-all; margin-bottom:10px; border:1px solid #555;">${link}</div>
             <button id="copyBtn" style="background:blue; color:white; border:none; padding:8px 15px; border-radius:5px; cursor:pointer; font-weight:bold;">COPY LINK</button>
             <br><br>
-            <div style="display:flex; justify-content:space-around; margin-bottom:20px;">
+            <div style="display:flex; justify-content:space-around;">
                 <a href="whatsapp://send?text=${encodeURIComponent(msg)}" style="background:#25D366; color:white; padding:8px; text-decoration:none; border-radius:5px;">WhatsApp</a>
                 <a href="https://t.me/share/url?url=${encodeURIComponent(link)}&text=${encodeURIComponent(msg)}" style="background:#0088cc; color:white; padding:8px; text-decoration:none; border-radius:5px;">Telegram</a>
-                <a href="fb-messenger://share/?link=${encodeURIComponent(link)}" style="background:#006AFF; color:white; padding:8px; text-decoration:none; border-radius:5px;">Messenger</a>
             </div>
-            <button id="closeShare" style="background:red; color:white; border:none; padding:10px 20px; border-radius:5px; cursor:pointer; font-weight:bold;">CLOSE</button>
         `;
-
         document.body.appendChild(div);
-
-        document.getElementById('copyBtn').onclick = () => {
-            navigator.clipboard.writeText(link);
-            alert("Link Copied!");
-        };
-        document.getElementById('closeShare').onclick = () => {
-            document.body.removeChild(div);
-        };
+        document.getElementById('copyBtn').onclick = () => { navigator.clipboard.writeText(link); alert("Link Copied!"); };
     }
 
     createMenuBar(w, h) {
+        this.closeActivePanel();
         const c = this.add.container(-350, 0).setDepth(999); this.menuBar = c;
         c.add(this.add.rectangle(0, h/2, 350, h, 0x111111).setOrigin(0, 0.5).setStrokeStyle(2, 0xFFD700));
         c.add(this.add.text(175, 60, 'PROFILE', { fontSize: '40px', fill: '#FFD700', fontStyle: 'bold' }).setOrigin(0.5));
@@ -495,9 +590,8 @@ class GameScene extends Phaser.Scene {
         const btns = [
             {t: 'DEPOSIT', c: 0x00FF00, cb: ()=>this.showDepositPanel()},
             {t: 'WITHDRAW', c: 0xFFA500, cb: ()=>this.showWithdrawPanel()},
-            {t: 'HISTORY', c: 0x00AAFF, cb: ()=>this.showHistoryPanel()},
+            {t: 'HISTORY', c: 0x00AAFF, cb: ()=>this.showHistoryPanel()}, // Betting History
             {t: 'GAME RULES', c: 0xFFFFFF, cb: ()=>this.showRulesPanel()},
-            // 🔥 Use New Share Panel
             {t: 'REFER & EARN', c: 0xE2136E, cb: ()=>this.showSharePanel()} 
         ];
         btns.forEach(b => { c.add(this.createGlossyBtn(175, y, b.t, b.c, b.cb)); y+=70; });
@@ -521,60 +615,12 @@ class GameScene extends Phaser.Scene {
         return c;
     }
 
-    createHTMLScrollPanel(title, dataList, onClose) {
-        const div = document.createElement('div');
-        div.style = "position:absolute; top:50%; left:50%; transform:translate(-50%, -50%); width:350px; height:500px; background:black; border:2px solid gold; overflow-y:auto; padding:15px; color:white; font-family:arial; z-index:1000; text-align:center; border-radius:10px;";
-        
-        const h2 = document.createElement('h2');
-        h2.innerText = title;
-        h2.style = "color: gold; border-bottom: 1px solid #555; padding-bottom: 10px;";
-        div.appendChild(h2);
-
-        if(dataList.length === 0) {
-            const p = document.createElement('p'); p.innerText = "No Records Found"; div.appendChild(p);
-        } else {
-            dataList.forEach(item => {
-                const p = document.createElement('p');
-                p.style = `border-bottom:1px solid #333; padding:8px; margin:0; color:${item.color}`;
-                p.innerText = item.text;
-                div.appendChild(p);
-            });
-        }
-
-        const btn = document.createElement('button');
-        btn.innerText = "CLOSE";
-        btn.style = "margin-top:20px; padding:10px 30px; background:red; color:white; border:none; border-radius:5px; font-weight:bold; cursor:pointer;";
-        btn.onclick = () => { document.body.removeChild(div); onClose(); };
-        div.appendChild(btn);
-
-        document.body.appendChild(div);
-    }
-
-    showTransactionHistory(type) {
-        fetch(`/api/user-transactions?username=${this.currentUser.username}&type=${type}`)
-        .then(r=>r.json()).then(data => {
-            const list = data.map(t => ({
-                text: `${new Date(t.date).toLocaleDateString()} | Tk ${t.amount} | ${t.status}`,
-                color: t.status === 'Success' ? '#0F0' : (t.status === 'Pending' ? '#FF0' : '#F00')
-            }));
-            this.createHTMLScrollPanel(`${type.toUpperCase()} HISTORY`, list, () => {});
-        });
-    }
-
-    showHistoryPanel() {
-        fetch(`/api/history?username=${this.currentUser.username}`).then(r=>r.json()).then(d => {
-            const list = d.map(h => ({
-                text: `${h.result} | Bet: ${h.betAmount} | Got: ${h.winAmount}`,
-                color: h.result === 'WIN' ? '#0F0' : '#F00'
-            }));
-            this.createHTMLScrollPanel("BETTING HISTORY", list, () => {});
-        });
-    }
-
-    // --- DEPOSIT SYSTEM ---
     showDepositPanel() {
+        this.closeActivePanel();
         const { width, height } = this.scale;
         const c = this.add.container(width/2, height/2).setDepth(300);
+        this.activePanel = c; // Track as active panel
+        
         c.add(this.add.rectangle(0,0,width,height,0x000000,0.8));
         c.add(this.add.rectangle(0,0,480,550,0xFFFFFF).setStrokeStyle(4, 0x00FF00));
         c.add(this.add.text(0,-230,"DEPOSIT", {fontSize:'32px', fill:'#000', fontStyle:'bold'}).setOrigin(0.5));
@@ -584,7 +630,6 @@ class GameScene extends Phaser.Scene {
 
         const b1 = this.add.text(0, 30, " bKash Payment ", {fontSize:'24px', backgroundColor:'#E2136E', padding:10}).setOrigin(0.5).setInteractive({useHandCursor:true});
         const b2 = this.add.text(0, 100, " Nagad Payment ", {fontSize:'24px', backgroundColor:'#F58220', padding:10}).setOrigin(0.5).setInteractive({useHandCursor:true});
-        
         const hBtn = this.add.text(0, 170, " [ VIEW HISTORY ] ", {fontSize:'20px', backgroundColor:'#00AAFF', padding:5}).setOrigin(0.5).setInteractive({useHandCursor:true});
         hBtn.on('pointerdown', ()=> { c.destroy(); this.showTransactionHistory('Deposit'); });
 
@@ -599,152 +644,19 @@ class GameScene extends Phaser.Scene {
         b1.on('pointerdown', () => validate('bKash', 0xE2136E));
         b2.on('pointerdown', () => validate('Nagad', 0xF58220));
 
-        c.add([b1, b2, hBtn]);
-        this.addCloseButton(c, ()=>c.destroy(), 230);
-    }
+        // 🔥 Fix: X Button (Top Right)
+        const closeBtn = this.add.text(210, -250, " X ", {fontSize:'28px', backgroundColor:'red', fill:'white', padding:5}).setOrigin(0.5).setInteractive({useHandCursor:true});
+        closeBtn.on('pointerdown', () => { c.destroy(); this.activePanel=null; });
 
-    createInputBox(x, y, placeholder, parent, uppercase = false) {
-        const bg = this.add.rectangle(x, y, 300, 50, 0xEEEEEE).setStrokeStyle(1, 0x000).setInteractive({useHandCursor:true});
-        const txt = this.add.text(x-140, y, placeholder, {fontSize:'18px', fill:'#555'}).setOrigin(0, 0.5);
-        const obj = { value: '' };
-        bg.on('pointerdown', () => {
-            let v = prompt(placeholder);
-            if(v) { 
-                if(uppercase) v = v.toUpperCase();
-                obj.value = v; 
-                txt.setText(v).setFill('#000'); 
-            }
-        });
-        parent.add([bg, txt]);
-        return obj;
-    }
-
-    showPaymentPage(amount, method, sender, color) {
-        const { width, height } = this.scale;
-        const c = this.add.container(width/2, height/2).setDepth(300);
-        c.add(this.add.rectangle(0,0,width,height,0x000000,0.9));
-        c.add(this.add.rectangle(0,0,480,650,0xFFFFFF).setStrokeStyle(5, color));
-
-        c.add(this.add.text(0,-280, `${method} PAYMENT`, {fontSize:'30px', fill: color==0xE2136E?'#E2136E':'#F58220', fontStyle:'bold'}).setOrigin(0.5));
-        c.add(this.add.text(0,-220, `Amount: Tk ${amount}`, {fontSize:'24px', fill:'#000'}).setOrigin(0.5));
-
-        const numList = method === 'bKash' ? PAYMENT_NUMBERS.bkash : PAYMENT_NUMBERS.nagad;
-        const index = new Date().getHours() % numList.length;
-        const targetNum = numList[index];
-
-        c.add(this.add.text(0, -150, "Send Money To:", {fontSize:'20px', fill:'#555'}).setOrigin(0.5));
-        const numTxt = this.add.text(0, -110, targetNum, {fontSize:'35px', fill: color==0xE2136E?'#E2136E':'#F58220', fontStyle:'bold', backgroundColor:'#EEE'}).setOrigin(0.5);
-        
-        const copyBtn = this.add.text(0, -60, " [ COPY NUMBER ] ", {fontSize:'18px', backgroundColor:'#000', fill:'#FFF'}).setOrigin(0.5).setInteractive({useHandCursor:true});
-        copyBtn.on('pointerdown', () => {
-            navigator.clipboard.writeText(targetNum);
-            alert("Number Copied!");
-        });
-
-        const trxInput = this.createInputBox(0, 50, "Enter TrxID", c, true);
-        
-        const subBtn = this.add.text(0, 150, " SUBMIT REQUEST ", {fontSize:'26px', backgroundColor:'#00AA00', padding:10}).setOrigin(0.5).setInteractive({useHandCursor:true});
-        subBtn.on('pointerdown', () => {
-            if(!trxInput.value) return alert("Please Enter TrxID!");
-            fetch('/api/transaction', { 
-                method:'POST', 
-                headers:{'Content-Type':'application/json'}, 
-                body:JSON.stringify({ type:'Deposit', method, amount: parseFloat(amount), phone: sender, trx: trxInput.value, username:this.currentUser.username }) 
-            })
-            .then(r=>r.json()).then(d=>{ alert(d.message); c.destroy(); });
-        });
-
-        c.add([numTxt, copyBtn, subBtn]);
-        this.addCloseButton(c, ()=>c.destroy(), 250);
-    }
-
-    showAdminDashboard() {
-        const { width, height } = this.scale;
-        const c = this.add.container(width/2, height/2).setDepth(2000); 
-        c.add(this.add.rectangle(0, 0, 500, 800, 0x111111).setStrokeStyle(3, 0xFFD700));
-        c.add(this.add.text(0, -360, "ADMIN CONTROL", { fontSize: '32px', fill: '#FFD700' }).setOrigin(0.5));
-        this.addCloseButton(c, ()=>c.destroy(), 350);
-
-        let y = -250;
-        const tools = [
-            {t:'USER MANAGEMENT', cb:()=>this.showUserListPanel()},
-            {t:'DEPOSIT REQS', cb:()=>this.showAdminRequestsPanel('Deposit')},
-            {t:'WITHDRAW REQS', cb:()=>this.showAdminRequestsPanel('Withdraw')},
-            {t:'GAME EDIT', cb:()=>this.showGameEditPanel()} 
-        ];
-        tools.forEach(t => { c.add(this.createGlossyBtn(0, y, t.t, 0xFFFFFF, t.cb)); y+=80; });
-    }
-
-    showGameEditPanel() {
-        const { width, height } = this.scale;
-        const c = this.add.container(width/2, height/2).setDepth(2100);
-        c.add(this.add.rectangle(0, 0, 500, 600, 0x222222).setStrokeStyle(2, 0xFFD700));
-        c.add(this.add.text(0, -250, "GAME SETTINGS", { fontSize: '28px', fill: '#FFD700' }).setOrigin(0.5));
-        this.addCloseButton(c, ()=>c.destroy(), 250);
-
-        let y = -150;
-        const rateTxt = this.add.text(0, y, `WIN RATE: ${this.currentWinRate}%`, {fontSize:'24px', fill:'#0F0'}).setOrigin(0.5);
-        const btnMinus = this.add.text(-120, y, " [-] ", {fontSize:'24px', backgroundColor:'#F00'}).setOrigin(0.5).setInteractive({useHandCursor:true});
-        const btnPlus = this.add.text(120, y, " [+] ", {fontSize:'24px', backgroundColor:'#0A0'}).setOrigin(0.5).setInteractive({useHandCursor:true});
-        
-        const updateRate = (n) => {
-            let newRate = this.currentWinRate + n;
-            if(newRate < 0) newRate = 0; if(newRate > 100) newRate = 100;
-            fetch('/api/admin/update-winrate', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({winRate:newRate})})
-            .then(()=>{ this.currentWinRate = newRate; rateTxt.setText(`WIN RATE: ${newRate}%`); });
-        };
-        btnMinus.on('pointerdown', () => updateRate(-10));
-        btnPlus.on('pointerdown', () => updateRate(10));
-        c.add([rateTxt, btnMinus, btnPlus]);
-
-        y += 100;
-        const noticeBtn = this.add.text(0, y, " UPDATE NOTICE ", {fontSize:'22px', backgroundColor:'#333', padding:10}).setOrigin(0.5).setInteractive({useHandCursor:true});
-        noticeBtn.on('pointerdown', () => {
-            const n = prompt("Enter new scrolling notice:");
-            if(n) fetch('/api/admin/update-notice',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({notice:n})}).then(()=>alert("Done"));
-        });
-        c.add(noticeBtn);
-    }
-
-    showUserListPanel() { 
-        const { width, height } = this.scale;
-        const c = this.add.container(width/2, height/2).setDepth(2100);
-        c.add(this.add.rectangle(0, 0, 520, 800, 0x222222).setStrokeStyle(2, 0xFFD700));
-        c.add(this.add.text(0, -350, "USER LIST (Click for Details)", { fontSize: '24px', fill: '#FFD700' }).setOrigin(0.5));
-        this.addCloseButton(c, ()=>c.destroy(), 350);
-        
-        fetch('/api/admin/users').then(r=>r.json()).then(users => {
-            let y = -280;
-            users.slice(0, 8).forEach(u => {
-                if(u.username === 'admin') return;
-                const btn = this.add.text(0, y, `${u.username} | Tk ${u.balance}`, { fontSize: '20px', fill: '#FFF', backgroundColor: '#333', padding: 10 }).setOrigin(0.5).setInteractive({useHandCursor:true});
-                btn.on('pointerdown', () => this.showUserDetails(u.username));
-                c.add(btn); y += 60;
-            });
-        });
-    }
-
-    showUserDetails(username) {
-        const { width, height } = this.scale;
-        const c = this.add.container(width/2, height/2).setDepth(2200);
-        c.add(this.add.rectangle(0, 0, 500, 700, 0x000000).setStrokeStyle(3, 0x00AAFF));
-        c.add(this.add.text(0, -300, `USER: ${username}`, { fontSize: '28px', fill: '#00AAFF', fontStyle: 'bold' }).setOrigin(0.5));
-        
-        fetch(`/api/admin/user-details?username=${username}`).then(r=>r.json()).then(d => {
-            if(!d.success) return alert("Error fetching data");
-            const u = d.user;
-            const info = `Mobile: ${u.mobile}\nBalance: ${u.balance}\nTotal Deposit: ${u.totalDeposit}\nTotal Withdraw: ${u.totalWithdraw}\nTotal Bet: ${u.totalBet}\nTotal Win: ${u.totalWin}\nStatus: ${u.isBanned ? 'BANNED' : 'ACTIVE'}`;
-            c.add(this.add.text(0, -50, info, { fontSize: '20px', fill: '#FFF', align: 'center' }).setOrigin(0.5));
-            const banBtn = this.add.text(0, 200, u.isBanned ? " UNBAN USER " : " BAN USER ", { fontSize: '24px', backgroundColor: u.isBanned ? '#0A0' : '#F00', padding: 10 }).setOrigin(0.5).setInteractive({useHandCursor:true});
-            banBtn.on('pointerdown', () => { fetch('/api/admin/ban-user', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ username: u.username, banStatus: !u.isBanned })}).then(()=>{ alert("Status Updated"); c.destroy(); }); });
-            c.add(banBtn);
-        });
-        this.addCloseButton(c, ()=>c.destroy(), 300);
+        c.add([b1, b2, hBtn, closeBtn]);
     }
 
     showWithdrawPanel() { 
+        this.closeActivePanel();
         const { width, height } = this.scale;
         const c = this.add.container(width/2, height/2).setDepth(300);
+        this.activePanel = c;
+
         c.add(this.add.rectangle(0,0,width,height,0x000000,0.8));
         c.add(this.add.rectangle(0,0,480,500,0xFFFFFF).setStrokeStyle(4, 0xFFA500));
         c.add(this.add.text(0,-200,"WITHDRAW", {fontSize:'32px', fill:'#000', fontStyle:'bold'}).setOrigin(0.5));
@@ -755,38 +667,20 @@ class GameScene extends Phaser.Scene {
         const hBtn = this.add.text(0, 100, " [ VIEW HISTORY ] ", {fontSize:'20px', backgroundColor:'#00AAFF', padding:5}).setOrigin(0.5).setInteractive({useHandCursor:true});
         hBtn.on('pointerdown', ()=> { c.destroy(); this.showTransactionHistory('Withdraw'); });
 
-        c.add([b1, hBtn]);
-        this.addCloseButton(c, ()=>c.destroy(), 220);
-    }
-    
-    showAdminRequestsPanel(type) {
-        const { width, height } = this.scale;
-        const c = this.add.container(width/2, height/2).setDepth(2100);
-        c.add(this.add.rectangle(0, 0, 520, 800, 0x222222).setStrokeStyle(2, 0xFFD700));
-        c.add(this.add.text(0, -350, `${type} REQ`, { fontSize: '28px', fill: '#FFD700' }).setOrigin(0.5));
-        this.addCloseButton(c, ()=>c.destroy(), 350);
-        fetch('/api/admin/transactions').then(r=>r.json()).then(data => {
-            const list = data.filter(t => t.status === 'Pending' && t.type === type);
-            if(list.length === 0) return c.add(this.add.text(0, 0, "No Requests", { fontSize: '20px', fill: '#AAA' }).setOrigin(0.5));
-            let y = -250;
-            list.slice(0, 6).forEach(req => {
-                c.add(this.add.text(-230, y, `${req.username} | ${req.amount}`, { fontSize: '18px', fill: '#FFF' }));
-                const ok = this.add.text(100, y, "✔", { fontSize: '24px', backgroundColor: '#0A0', padding: 5 }).setInteractive({useHandCursor:true}).on('pointerdown', () => this.handleAdminAction(req.trx||req.phone, 'approve', req, c, type));
-                const no = this.add.text(160, y, "X", { fontSize: '24px', backgroundColor: '#F00', padding: 5 }).setInteractive({useHandCursor:true}).on('pointerdown', () => this.handleAdminAction(req.trx||req.phone, 'reject', req, c, type));
-                c.add([ok, no]); y += 80;
-            });
-        });
-    }
-    
-    handleAdminAction(id, action, req, panel, type) { fetch('/api/admin/action', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ trxId: id, action, type: req.type, amount: req.amount, username: req.username }) }).then(() => { panel.destroy(); this.showAdminRequestsPanel(type); }); }
+        const closeBtn = this.add.text(210, -230, " X ", {fontSize:'28px', backgroundColor:'red', fill:'white', padding:5}).setOrigin(0.5).setInteractive({useHandCursor:true});
+        closeBtn.on('pointerdown', () => { c.destroy(); this.activePanel=null; });
 
-    showReferralInfo() { this.showInfoPanel("REFERRAL SYSTEM", `Your Code: ${this.currentUser.myCode}\n\n1. Share code with friends.\n2. You get 200 Tk Bonus!\n3. 10% commission on deposit!`); }
-    showRulesPanel() { this.showInfoPanel("GAME RULES", `1. Valid Bkash/Nagad number.\n2. Min Deposit: 50\n3. Min Withdraw: 100\n4. No fake TrxID.\n5. Server decision is final.`); }
-    addCloseButton(c, cb, y) { const b = this.add.text(0, y, "CLOSE", { fontSize: '24px', fill: '#FFF', backgroundColor: '#F00', padding: 10 }).setOrigin(0.5).setInteractive({useHandCursor:true}); b.on('pointerdown', cb); c.add(b); }
-    showInfoPanel(t, content) { alert(`${t}\n\n${content}`); }
-    updateUI() { if(this.balanceText) this.balanceText.setText(`Tk ${this.balance.toFixed(2)}`); if(this.menuBalance) this.menuBalance.setText(`Bal: Tk ${this.balance.toFixed(2)}`); if(this.betAdjustText) this.betAdjustText.setText(`Tk ${this.currentBet}`); }
-    adjustBet(n) { let b=this.currentBet+n; if(b>=1 && b<=1000){this.currentBet=b; this.updateUI();} }
-    toggleMenu() { this.isMenuOpen=!this.isMenuOpen; this.tweens.add({targets:this.menuBar, x:this.isMenuOpen?0:-350, duration:300}); }
+        c.add([b1, hBtn, closeBtn]);
+    }
+
+    // (Global Access for HTML buttons)
+    constructor() {
+        super('GameScene');
+        window.gameScene = this; // Expose scene globally
+        this.currentUser = null;
+        this.soundEnabled = true;
+        this.currentWinRate = 30;
+    }
 }
 
 const config = {
