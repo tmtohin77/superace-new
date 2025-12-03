@@ -65,11 +65,8 @@ class PreloadScene extends Phaser.Scene {
         this.load.image('jack', 'jack.png');
         this.load.image('spade', 'spade.png');
         this.load.image('coin', 'coin.png'); 
-        
-        // 🔥 Ensure these exist in assets folder
         this.load.image('sound_on', 'sound_on.png');
         this.load.image('sound_off', 'sound_off.png'); 
-        
         this.load.audio('spin_start', 'spin_start.mp3');
         this.load.audio('reel_stop', 'reel_stop.mp3');
         this.load.audio('win_sound', 'win_sound.mp3');
@@ -80,8 +77,7 @@ class PreloadScene extends Phaser.Scene {
 // Scene 1: Login
 // =======================================================
 class LoginScene extends Phaser.Scene {
-    constructor() { super('LoginScene'); this.username = ''; this.password = ''; this.mobile = ''; this.newUsername = ''; this.newPassword = ''; this.refCode = ''; }
-    
+    constructor() { super('LoginScene'); }
     create() {
         const { width, height } = this.scale;
         this.add.image(width/2, height/2, 'background').setDisplaySize(width, height);
@@ -182,7 +178,6 @@ class GameScene extends Phaser.Scene {
         this.isSpinning = false; this.currentBet = 10.00; this.reelsStopped = 0;
         const { width, height } = this.scale;
         
-        // 1. Background (Depth 0)
         this.add.image(width/2, height/2, 'background').setDisplaySize(width, height).setDepth(0);
 
         this.coinParticles = this.add.particles('coin');
@@ -191,13 +186,14 @@ class GameScene extends Phaser.Scene {
         const maskShape = this.make.graphics().fillStyle(0xffffff).fillRect(START_X-LAYOUT.REEL_WIDTH/2-5, LAYOUT.START_Y-LAYOUT.SYMBOL_HEIGHT/2-5, TOTAL_GRID_WIDTH+10, (LAYOUT.SYMBOL_HEIGHT*ROW_COUNT)+(LAYOUT.GAP*ROW_COUNT)+20);
         const gridMask = maskShape.createGeometryMask();
         
-        // 🔥 Fix 3: Layering
-        // Golden Frame (Cell BG) = Depth 2
-        // Symbols = Depth 3
-        // Reel Frame (Main Grid) = Depth 4
+        // 🔥 Fix 1: Layering Fixed
+        // 5 = Grid (Bottom)
+        // 6 = Symbol (Middle)
+        // 10 = Reel Frame (Top - Over everything)
         
         const frameCenterY = LAYOUT.START_Y + ((ROW_COUNT-1)*(LAYOUT.SYMBOL_HEIGHT+LAYOUT.GAP))/2;
-        this.add.image(width/2, frameCenterY, 'reel_frame_img').setDisplaySize(TOTAL_GRID_WIDTH+30, (LAYOUT.SYMBOL_HEIGHT*ROW_COUNT)+40).setDepth(4); 
+        // Reel Frame (Topmost)
+        this.add.image(width/2, frameCenterY, 'reel_frame_img').setDisplaySize(TOTAL_GRID_WIDTH+30, (LAYOUT.SYMBOL_HEIGHT*ROW_COUNT)+40).setDepth(10); 
         
         this.symbols = [];
         for (let reel=0; reel<REEL_COUNT; reel++) {
@@ -206,11 +202,11 @@ class GameScene extends Phaser.Scene {
                 const x = START_X + reel*(LAYOUT.REEL_WIDTH+LAYOUT.GAP); 
                 const y = LAYOUT.START_Y + row*(LAYOUT.SYMBOL_HEIGHT+LAYOUT.GAP); 
                 
-                // Individual Golden Frame (Depth 2)
-                this.add.image(x, y, 'golden_frame').setDisplaySize(LAYOUT.REEL_WIDTH, LAYOUT.SYMBOL_HEIGHT).setDepth(2); 
+                // Individual Frame (Bottom)
+                this.add.image(x, y, 'golden_frame').setDisplaySize(LAYOUT.REEL_WIDTH, LAYOUT.SYMBOL_HEIGHT).setDepth(5); 
                 
-                // Symbol (Depth 3)
-                const s = this.add.image(x, y, Phaser.Utils.Array.GetRandom(SYMBOL_KEYS)).setDisplaySize(LAYOUT.REEL_WIDTH-15, LAYOUT.SYMBOL_HEIGHT-15).setDepth(3).setMask(gridMask);
+                // Symbol (Middle - Above golden frame, Below Reel Frame)
+                const s = this.add.image(x, y, Phaser.Utils.Array.GetRandom(SYMBOL_KEYS)).setDisplaySize(LAYOUT.REEL_WIDTH-15, LAYOUT.SYMBOL_HEIGHT-15).setDepth(6).setMask(gridMask);
                 
                 s.originalX = x; s.originalY = y; s.rowIndex = row; 
                 this.symbols[reel][row] = s;
@@ -227,11 +223,9 @@ class GameScene extends Phaser.Scene {
         this.soundBtn = this.add.image(width-40, 80, 'sound_on').setDisplaySize(50, 50).setInteractive({useHandCursor:true}).setDepth(50);
         this.soundWaves = this.add.text(width-70, 80, ')))', {fontSize: '20px', fill: '#0F0'}).setOrigin(1, 0.5).setDepth(50);
         
-        // 🔥 Fix 2: Sound Toggle Check
         this.soundBtn.on('pointerdown', () => { 
             this.soundEnabled = !this.soundEnabled; 
             this.sound.mute = !this.soundEnabled; 
-            // Make sure 'sound_off.png' exists in assets!
             this.soundBtn.setTexture(this.soundEnabled ? 'sound_on' : 'sound_off'); 
             this.soundWaves.setVisible(this.soundEnabled);
         });
@@ -252,8 +246,9 @@ class GameScene extends Phaser.Scene {
         this.spinButton.on('pointerdown', this.startSpin, this);
         this.add.text(width/2, uiY, 'SPIN', { font: 'bold 18px Arial', fill: '#FFD700' }).setOrigin(0.5).setDepth(53);
 
+        // 🔥 Fix 3: Minus Button Size Increased (0.40)
         this.add.image(width-80, uiY-60, 'plus_button').setScale(0.35).setInteractive().setDepth(52).on('pointerdown', () => this.adjustBet(1));
-        this.add.image(width-80, uiY+60, 'minus_button').setScale(0.35).setInteractive().setDepth(52).on('pointerdown', () => this.adjustBet(-1));
+        this.add.image(width-80, uiY+60, 'minus_button').setScale(0.40).setInteractive().setDepth(52).on('pointerdown', () => this.adjustBet(-1));
         
         this.betAdjustText = this.add.text(width-80, uiY+5, `Tk ${this.currentBet}`, { fontSize: '24px', fill: '#FFF' }).setOrigin(0.5).setDepth(52);
         this.balanceText = this.add.text(20, height-40, `Tk ${this.balance.toFixed(2)}`, { fontSize: '20px', fill: '#FFF' }).setDepth(52);
@@ -471,13 +466,62 @@ class GameScene extends Phaser.Scene {
         return c;
     }
 
-    // --- DEPOSIT SYSTEM FIX 1: Layout Fix ---
+    // ---🔥 FIX 2: Scrolling History Logic (DOM) ---
+    createHTMLScrollPanel(title, dataList, onClose) {
+        const div = document.createElement('div');
+        div.style = "position:absolute; top:50%; left:50%; transform:translate(-50%, -50%); width:350px; height:500px; background:black; border:2px solid gold; overflow-y:auto; padding:15px; color:white; font-family:arial; z-index:1000; text-align:center; border-radius:10px;";
+        
+        const h2 = document.createElement('h2');
+        h2.innerText = title;
+        h2.style = "color: gold; border-bottom: 1px solid #555; padding-bottom: 10px;";
+        div.appendChild(h2);
+
+        if(dataList.length === 0) {
+            const p = document.createElement('p'); p.innerText = "No Records Found"; div.appendChild(p);
+        } else {
+            dataList.forEach(item => {
+                const p = document.createElement('p');
+                p.style = `border-bottom:1px solid #333; padding:8px; margin:0; color:${item.color}`;
+                p.innerText = item.text;
+                div.appendChild(p);
+            });
+        }
+
+        const btn = document.createElement('button');
+        btn.innerText = "CLOSE";
+        btn.style = "margin-top:20px; padding:10px 30px; background:red; color:white; border:none; border-radius:5px; font-weight:bold; cursor:pointer;";
+        btn.onclick = () => { document.body.removeChild(div); onClose(); };
+        div.appendChild(btn);
+
+        document.body.appendChild(div);
+    }
+
+    showTransactionHistory(type) {
+        fetch(`/api/user-transactions?username=${this.currentUser.username}&type=${type}`)
+        .then(r=>r.json()).then(data => {
+            const list = data.map(t => ({
+                text: `${new Date(t.date).toLocaleDateString()} | Tk ${t.amount} | ${t.status}`,
+                color: t.status === 'Success' ? '#0F0' : (t.status === 'Pending' ? '#FF0' : '#F00')
+            }));
+            this.createHTMLScrollPanel(`${type.toUpperCase()} HISTORY`, list, () => {});
+        });
+    }
+
+    showHistoryPanel() {
+        fetch(`/api/history?username=${this.currentUser.username}`).then(r=>r.json()).then(d => {
+            const list = d.map(h => ({
+                text: `${h.result} | Bet: ${h.betAmount} | Got: ${h.winAmount}`,
+                color: h.result === 'WIN' ? '#0F0' : '#F00'
+            }));
+            this.createHTMLScrollPanel("BETTING HISTORY", list, () => {});
+        });
+    }
+
+    // --- OTHER PANELS ---
     showDepositPanel() {
         const { width, height } = this.scale;
         const c = this.add.container(width/2, height/2).setDepth(300);
         c.add(this.add.rectangle(0,0,width,height,0x000000,0.8));
-        
-        // Increased height to 550 to fit buttons
         c.add(this.add.rectangle(0,0,480,550,0xFFFFFF).setStrokeStyle(4, 0x00FF00));
         c.add(this.add.text(0,-230,"DEPOSIT", {fontSize:'32px', fill:'#000', fontStyle:'bold'}).setOrigin(0.5));
 
@@ -487,7 +531,6 @@ class GameScene extends Phaser.Scene {
         const b1 = this.add.text(0, 30, " bKash Payment ", {fontSize:'24px', backgroundColor:'#E2136E', padding:10}).setOrigin(0.5).setInteractive({useHandCursor:true});
         const b2 = this.add.text(0, 100, " Nagad Payment ", {fontSize:'24px', backgroundColor:'#F58220', padding:10}).setOrigin(0.5).setInteractive({useHandCursor:true});
         
-        // Moved History button slightly up
         const hBtn = this.add.text(0, 170, " [ VIEW HISTORY ] ", {fontSize:'20px', backgroundColor:'#00AAFF', padding:5}).setOrigin(0.5).setInteractive({useHandCursor:true});
         hBtn.on('pointerdown', ()=> { c.destroy(); this.showTransactionHistory('Deposit'); });
 
@@ -503,8 +546,6 @@ class GameScene extends Phaser.Scene {
         b2.on('pointerdown', () => validate('Nagad', 0xF58220));
 
         c.add([b1, b2, hBtn]);
-        
-        // 🔥 Moved Close button UP to stay inside the box
         this.addCloseButton(c, ()=>c.destroy(), 230);
     }
 
@@ -563,7 +604,6 @@ class GameScene extends Phaser.Scene {
         this.addCloseButton(c, ()=>c.destroy(), 250);
     }
 
-    // --- ADMIN PANEL ---
     showAdminDashboard() {
         const { width, height } = this.scale;
         const c = this.add.container(width/2, height/2).setDepth(2000); 
@@ -664,29 +704,6 @@ class GameScene extends Phaser.Scene {
         c.add([b1, hBtn]);
         this.addCloseButton(c, ()=>c.destroy(), 220);
     }
-
-    showTransactionHistory(type) {
-        const { width, height } = this.scale;
-        const c = this.add.container(width/2, height/2).setDepth(600);
-        c.add(this.add.rectangle(0,0,480,700,0x111111).setStrokeStyle(2,0xFFFFFF));
-        c.add(this.add.text(0,-320,`${type} HISTORY`, {fontSize:'28px',fill:'#FFF'}).setOrigin(0.5));
-        this.addCloseButton(c, ()=>c.destroy(), 320);
-
-        fetch(`/api/user-transactions?username=${this.currentUser.username}&type=${type}`)
-        .then(r=>r.json()).then(data => {
-            if(data.length === 0) return c.add(this.add.text(0,0,"No Records", {fontSize:'20px', fill:'#888'}).setOrigin(0.5));
-            let y = -250;
-            data.forEach(t => {
-                let color = '#FFF';
-                if(t.status === 'Success') color = '#0F0';
-                if(t.status === 'Failed') color = '#F00';
-                if(t.status === 'Pending') color = '#FF0';
-                const date = new Date(t.date).toLocaleDateString();
-                c.add(this.add.text(-220, y, `${date} | ${t.amount} | ${t.status}`, {fontSize:'18px', fill:color}));
-                y += 40;
-            });
-        });
-    }
     
     showAdminRequestsPanel(type) {
         const { width, height } = this.scale;
@@ -708,22 +725,6 @@ class GameScene extends Phaser.Scene {
     }
     
     handleAdminAction(id, action, req, panel, type) { fetch('/api/admin/action', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ trxId: id, action, type: req.type, amount: req.amount, username: req.username }) }).then(() => { panel.destroy(); this.showAdminRequestsPanel(type); }); }
-
-    showHistoryPanel() {
-        const { width, height } = this.scale;
-        const c = this.add.container(width/2, height/2).setDepth(600);
-        c.add(this.add.rectangle(0,0,480,700,0x111111).setStrokeStyle(2,0xFFFFFF));
-        c.add(this.add.text(0,-320,"BETTING HISTORY", {fontSize:'28px',fill:'#FFF'}).setOrigin(0.5));
-        this.addCloseButton(c, ()=>c.destroy(), 320);
-        fetch(`/api/history?username=${this.currentUser.username}`).then(r=>r.json()).then(d => {
-            let y=-250;
-            d.forEach(h=>{
-                const color = h.result === 'WIN' ? '#0F0' : '#F00';
-                c.add(this.add.text(-200,y,`${h.result} | Bet: ${h.betAmount} | Got: ${h.winAmount}`,{fontSize:'16px',fill:color}));
-                y+=40;
-            });
-        });
-    }
 
     showReferralInfo() { this.showInfoPanel("REFERRAL SYSTEM", `Your Code: ${this.currentUser.myCode}\n\n1. Share code with friends.\n2. You get 200 Tk Bonus!\n3. 10% commission on deposit!`); }
     showRulesPanel() { this.showInfoPanel("GAME RULES", `1. Valid Bkash/Nagad number.\n2. Min Deposit: 50\n3. Min Withdraw: 100\n4. No fake TrxID.\n5. Server decision is final.`); }
