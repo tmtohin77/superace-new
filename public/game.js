@@ -74,10 +74,11 @@ class PreloadScene extends Phaser.Scene {
 }
 
 // =======================================================
-// Scene 1: Login
+// Scene 1: Login (Auto Refer Logic Added)
 // =======================================================
 class LoginScene extends Phaser.Scene {
-    constructor() { super('LoginScene'); }
+    constructor() { super('LoginScene'); this.username = ''; this.password = ''; this.mobile = ''; this.newUsername = ''; this.newPassword = ''; this.refCode = ''; }
+    
     create() {
         const { width, height } = this.scale;
         this.add.image(width/2, height/2, 'background').setDisplaySize(width, height);
@@ -86,14 +87,29 @@ class LoginScene extends Phaser.Scene {
         const boxY = height/2 + 40;
         this.add.rectangle(width/2, boxY, 480, 650, 0x000000, 0.7).setStrokeStyle(3, 0xFFD700);
 
+        // 🔥 Auto Fill Referral Code from URL
+        const urlParams = new URLSearchParams(window.location.search);
+        const refParam = urlParams.get('ref');
+        if(refParam) this.refCode = refParam;
+
         this.loginContainer = this.createLoginUI(width, boxY);
         this.regContainer = this.createRegistrationUI(width, boxY);
-        this.regContainer.setVisible(false);
+        
+        // If ref link used, show register page first
+        if(refParam) {
+            this.loginContainer.setVisible(false);
+            this.regContainer.setVisible(true);
+        } else {
+            this.regContainer.setVisible(false);
+        }
     }
 
-    createInputField(x, y, p, n, isP) { 
+    createInputField(x, y, p, n, isP, defaultVal = '') { 
         const bg = this.add.rectangle(x, y, 350, 55, 0xFFFFFF).setStrokeStyle(2, 0x555555).setInteractive({ useHandCursor: true });
-        const txt = this.add.text(x-160, y, p, { fontSize: '20px', fill: '#555', fontStyle: 'bold' }).setOrigin(0, 0.5);
+        // Use default value if exists (for ref code)
+        const displayTxt = defaultVal ? defaultVal : p;
+        const txt = this.add.text(x-160, y, displayTxt, { fontSize: '20px', fill: defaultVal ? '#000' : '#555', fontStyle: 'bold' }).setOrigin(0, 0.5);
+        
         bg.on('pointerdown', () => {
             let v = prompt(`${p}:`, this[n] || '');
             if (v !== null) { this[n] = v; txt.setText(v ? (isP ? '•'.repeat(v.length) : v) : p).setFill(v ? '#000' : '#555'); }
@@ -132,7 +148,8 @@ class LoginScene extends Phaser.Scene {
         c.add(this.createInputField(w/2, startY + 70, 'Mobile Number', 'mobile', false));
         c.add(this.createInputField(w/2, startY + 140, 'Username', 'newUsername', false));
         c.add(this.createInputField(w/2, startY + 210, 'Password', 'newPassword', true));
-        c.add(this.createInputField(w/2, startY + 280, 'Referral Code (Opt)', 'refCode', false));
+        // 🔥 Pre-fill ref code if available
+        c.add(this.createInputField(w/2, startY + 280, 'Referral Code (Opt)', 'refCode', false, this.refCode));
         c.add(this.createBtn(w/2, startY + 370, 'REGISTER', 0x00AA00, '#FFF', this.handleRegistration.bind(this)));
         const back = this.add.text(w/2, startY + 450, '<< Back to Login', { fontSize: '22px', fill: '#FFD700', fontStyle: 'bold' }).setOrigin(0.5).setInteractive({useHandCursor:true});
         back.on('pointerdown', () => { this.loginContainer.setVisible(true); this.regContainer.setVisible(false); });
@@ -178,6 +195,7 @@ class GameScene extends Phaser.Scene {
         this.isSpinning = false; this.currentBet = 10.00; this.reelsStopped = 0;
         const { width, height } = this.scale;
         
+        // 1. Background (Depth 0)
         this.add.image(width/2, height/2, 'background').setDisplaySize(width, height).setDepth(0);
 
         this.coinParticles = this.add.particles('coin');
@@ -186,14 +204,14 @@ class GameScene extends Phaser.Scene {
         const maskShape = this.make.graphics().fillStyle(0xffffff).fillRect(START_X-LAYOUT.REEL_WIDTH/2-5, LAYOUT.START_Y-LAYOUT.SYMBOL_HEIGHT/2-5, TOTAL_GRID_WIDTH+10, (LAYOUT.SYMBOL_HEIGHT*ROW_COUNT)+(LAYOUT.GAP*ROW_COUNT)+20);
         const gridMask = maskShape.createGeometryMask();
         
-        // 🔥 Fix 1: Layering Fixed
-        // 5 = Grid (Bottom)
-        // 6 = Symbol (Middle)
-        // 10 = Reel Frame (Top - Over everything)
+        // 🔥 Fix 1: Layering Fixed (Frame at Bottom, Symbol at Top)
+        // Depth 2 = Reel Frame (Big) - Now at bottom
+        // Depth 3 = Golden Frame (Small) - Middle
+        // Depth 4 = Symbols - Top
         
         const frameCenterY = LAYOUT.START_Y + ((ROW_COUNT-1)*(LAYOUT.SYMBOL_HEIGHT+LAYOUT.GAP))/2;
-        // Reel Frame (Topmost)
-        this.add.image(width/2, frameCenterY, 'reel_frame_img').setDisplaySize(TOTAL_GRID_WIDTH+30, (LAYOUT.SYMBOL_HEIGHT*ROW_COUNT)+40).setDepth(10); 
+        // Big Frame is now BEHIND (Depth 2)
+        this.add.image(width/2, frameCenterY, 'reel_frame_img').setDisplaySize(TOTAL_GRID_WIDTH+30, (LAYOUT.SYMBOL_HEIGHT*ROW_COUNT)+40).setDepth(2); 
         
         this.symbols = [];
         for (let reel=0; reel<REEL_COUNT; reel++) {
@@ -202,11 +220,11 @@ class GameScene extends Phaser.Scene {
                 const x = START_X + reel*(LAYOUT.REEL_WIDTH+LAYOUT.GAP); 
                 const y = LAYOUT.START_Y + row*(LAYOUT.SYMBOL_HEIGHT+LAYOUT.GAP); 
                 
-                // Individual Frame (Bottom)
-                this.add.image(x, y, 'golden_frame').setDisplaySize(LAYOUT.REEL_WIDTH, LAYOUT.SYMBOL_HEIGHT).setDepth(5); 
+                // Individual Frame (Depth 3)
+                this.add.image(x, y, 'golden_frame').setDisplaySize(LAYOUT.REEL_WIDTH, LAYOUT.SYMBOL_HEIGHT).setDepth(3); 
                 
-                // Symbol (Middle - Above golden frame, Below Reel Frame)
-                const s = this.add.image(x, y, Phaser.Utils.Array.GetRandom(SYMBOL_KEYS)).setDisplaySize(LAYOUT.REEL_WIDTH-15, LAYOUT.SYMBOL_HEIGHT-15).setDepth(6).setMask(gridMask);
+                // Symbol (Depth 4 - On Top)
+                const s = this.add.image(x, y, Phaser.Utils.Array.GetRandom(SYMBOL_KEYS)).setDisplaySize(LAYOUT.REEL_WIDTH-15, LAYOUT.SYMBOL_HEIGHT-15).setDepth(4).setMask(gridMask);
                 
                 s.originalX = x; s.originalY = y; s.rowIndex = row; 
                 this.symbols[reel][row] = s;
@@ -246,9 +264,9 @@ class GameScene extends Phaser.Scene {
         this.spinButton.on('pointerdown', this.startSpin, this);
         this.add.text(width/2, uiY, 'SPIN', { font: 'bold 18px Arial', fill: '#FFD700' }).setOrigin(0.5).setDepth(53);
 
-        // 🔥 Fix 3: Minus Button Size Increased (0.40)
+        // 🔥 Fix 2: Minus Button Size Increased (0.45)
         this.add.image(width-80, uiY-60, 'plus_button').setScale(0.35).setInteractive().setDepth(52).on('pointerdown', () => this.adjustBet(1));
-        this.add.image(width-80, uiY+60, 'minus_button').setScale(0.40).setInteractive().setDepth(52).on('pointerdown', () => this.adjustBet(-1));
+        this.add.image(width-80, uiY+60, 'minus_button').setScale(0.45).setInteractive().setDepth(52).on('pointerdown', () => this.adjustBet(-1));
         
         this.betAdjustText = this.add.text(width-80, uiY+5, `Tk ${this.currentBet}`, { fontSize: '24px', fill: '#FFF' }).setOrigin(0.5).setDepth(52);
         this.balanceText = this.add.text(20, height-40, `Tk ${this.balance.toFixed(2)}`, { fontSize: '20px', fill: '#FFF' }).setDepth(52);
@@ -426,6 +444,42 @@ class GameScene extends Phaser.Scene {
         return total;
     }
 
+    // --- 🔥 FIX 3: SHARE PANEL (HTML Overlay) ---
+    showSharePanel() {
+        const code = this.currentUser.myCode || "LOADING";
+        const link = `https://superace-new.onrender.com/?ref=${code}`;
+        const msg = `Join SuperAce Casino and get 200 Tk Bonus! Use my code: ${code} \nLink: ${link}`;
+
+        const div = document.createElement('div');
+        div.style = "position:absolute; top:50%; left:50%; transform:translate(-50%, -50%); width:320px; background:#111; border:2px solid gold; padding:20px; color:white; font-family:arial; text-align:center; border-radius:10px; z-index:9999;";
+        
+        div.innerHTML = `
+            <h2 style="color:gold; margin-top:0;">REFER & EARN</h2>
+            <p style="color:#AAA;">Share this link to earn commission!</p>
+            <div style="background:#333; padding:10px; border-radius:5px; word-break:break-all; margin-bottom:10px; border:1px solid #555;">
+                ${link}
+            </div>
+            <button id="copyBtn" style="background:blue; color:white; border:none; padding:8px 15px; border-radius:5px; cursor:pointer; font-weight:bold;">COPY LINK</button>
+            <br><br>
+            <div style="display:flex; justify-content:space-around; margin-bottom:20px;">
+                <a href="whatsapp://send?text=${encodeURIComponent(msg)}" style="background:#25D366; color:white; padding:8px; text-decoration:none; border-radius:5px;">WhatsApp</a>
+                <a href="https://t.me/share/url?url=${encodeURIComponent(link)}&text=${encodeURIComponent(msg)}" style="background:#0088cc; color:white; padding:8px; text-decoration:none; border-radius:5px;">Telegram</a>
+                <a href="fb-messenger://share/?link=${encodeURIComponent(link)}" style="background:#006AFF; color:white; padding:8px; text-decoration:none; border-radius:5px;">Messenger</a>
+            </div>
+            <button id="closeShare" style="background:red; color:white; border:none; padding:10px 20px; border-radius:5px; cursor:pointer; font-weight:bold;">CLOSE</button>
+        `;
+
+        document.body.appendChild(div);
+
+        document.getElementById('copyBtn').onclick = () => {
+            navigator.clipboard.writeText(link);
+            alert("Link Copied!");
+        };
+        document.getElementById('closeShare').onclick = () => {
+            document.body.removeChild(div);
+        };
+    }
+
     createMenuBar(w, h) {
         const c = this.add.container(-350, 0).setDepth(999); this.menuBar = c;
         c.add(this.add.rectangle(0, h/2, 350, h, 0x111111).setOrigin(0, 0.5).setStrokeStyle(2, 0xFFD700));
@@ -443,7 +497,8 @@ class GameScene extends Phaser.Scene {
             {t: 'WITHDRAW', c: 0xFFA500, cb: ()=>this.showWithdrawPanel()},
             {t: 'HISTORY', c: 0x00AAFF, cb: ()=>this.showHistoryPanel()},
             {t: 'GAME RULES', c: 0xFFFFFF, cb: ()=>this.showRulesPanel()},
-            {t: 'REFER & EARN', c: 0xE2136E, cb: ()=>this.showReferralInfo()}
+            // 🔥 Use New Share Panel
+            {t: 'REFER & EARN', c: 0xE2136E, cb: ()=>this.showSharePanel()} 
         ];
         btns.forEach(b => { c.add(this.createGlossyBtn(175, y, b.t, b.c, b.cb)); y+=70; });
 
@@ -466,7 +521,6 @@ class GameScene extends Phaser.Scene {
         return c;
     }
 
-    // ---🔥 FIX 2: Scrolling History Logic (DOM) ---
     createHTMLScrollPanel(title, dataList, onClose) {
         const div = document.createElement('div');
         div.style = "position:absolute; top:50%; left:50%; transform:translate(-50%, -50%); width:350px; height:500px; background:black; border:2px solid gold; overflow-y:auto; padding:15px; color:white; font-family:arial; z-index:1000; text-align:center; border-radius:10px;";
@@ -517,7 +571,7 @@ class GameScene extends Phaser.Scene {
         });
     }
 
-    // --- OTHER PANELS ---
+    // --- DEPOSIT SYSTEM ---
     showDepositPanel() {
         const { width, height } = this.scale;
         const c = this.add.container(width/2, height/2).setDepth(300);
