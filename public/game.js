@@ -1,5 +1,5 @@
 // ===================================
-// ১. কনফিগারেশন
+// ১. কনফিগারেশন (Configuration)
 // ===================================
 const LAYOUT = {
     REEL_WIDTH: 105,
@@ -32,36 +32,52 @@ const PAYMENT_NUMBERS = {
 // =======================================================
 class PreloadScene extends Phaser.Scene {
     constructor() { super('PreloadScene'); }
+    
     preload() {
         const { width, height } = this.scale;
+        
+        // Loading Bar
         const progressBar = this.add.graphics();
         const progressBox = this.add.graphics();
         progressBox.fillStyle(0x222222, 0.8);
         progressBox.fillRect(width/2 - 150, height/2, 300, 40);
         const percentText = this.add.text(width/2, height/2 + 20, '0%', { font: '18px Arial', fill: '#ffffff' }).setOrigin(0.5);
+
         this.load.path = 'assets/'; 
+
         this.load.on('progress', (value) => {
             percentText.setText(parseInt(value * 100) + '%');
             progressBar.clear();
             progressBar.fillStyle(0xFFD700, 1);
             progressBar.fillRect(width/2 - 140, height/2 + 10, 280 * value, 20);
         });
-        this.load.on('complete', () => { this.scene.start('LoginScene'); });
+
+        this.load.on('complete', () => { 
+            this.scene.start('LoginScene'); 
+        });
+
+        // Load Images
         this.load.image('background', 'new_background.jpg'); 
         this.load.image('reel_frame_img', 'reel_frame.png'); 
         this.load.image('golden_frame', 'golden_frame.png'); 
         this.load.image('bet_button', 'bet_button.png');
         this.load.image('plus_button', 'plus_button.png'); 
         this.load.image('minus_button', 'minus_button.png'); 
+        
+        // Symbols
         this.load.image('golden_burger', 'golden_burger.png');
         this.load.image('ace', 'ace.png');
         this.load.image('king', 'king.png');
         this.load.image('queen', 'queen.png');
         this.load.image('jack', 'jack.png');
         this.load.image('spade', 'spade.png');
+        
+        // Effects
         this.load.image('coin', 'coin.png'); 
         this.load.image('sound_on', 'sound_on.png');
         this.load.image('sound_off', 'sound_off.png'); 
+        
+        // Audio
         this.load.audio('spin_start', 'spin_start.mp3');
         this.load.audio('reel_stop', 'reel_stop.mp3');
         this.load.audio('win_sound', 'win_sound.mp3');
@@ -72,20 +88,37 @@ class PreloadScene extends Phaser.Scene {
 // Scene 1: Login
 // =======================================================
 class LoginScene extends Phaser.Scene {
-    constructor() { super('LoginScene'); this.username = ''; this.password = ''; this.mobile = ''; this.newUsername = ''; this.newPassword = ''; this.refCode = ''; }
+    constructor() { 
+        super('LoginScene'); 
+        this.username = ''; 
+        this.password = ''; 
+        this.mobile = ''; 
+        this.newUsername = ''; 
+        this.newPassword = ''; 
+        this.refCode = ''; 
+    }
     
     create() {
         const { width, height } = this.scale;
         this.add.image(width/2, height/2, 'background').setDisplaySize(width, height);
         this.add.text(width/2, 100, 'SuperAce Casino', { font: 'bold 45px Arial', fill: '#FFD700', stroke: '#000', strokeThickness: 6 }).setOrigin(0.5); 
+
         const boxY = height/2 + 40;
         this.add.rectangle(width/2, boxY, 480, 650, 0x000000, 0.7).setStrokeStyle(3, 0xFFD700);
+
         const urlParams = new URLSearchParams(window.location.search);
         const refParam = urlParams.get('ref');
         if(refParam) this.refCode = refParam;
+
         this.loginContainer = this.createLoginUI(width, boxY);
         this.regContainer = this.createRegistrationUI(width, boxY);
-        if(refParam) { this.loginContainer.setVisible(false); this.regContainer.setVisible(true); } else { this.regContainer.setVisible(false); }
+        
+        if(refParam) {
+            this.loginContainer.setVisible(false);
+            this.regContainer.setVisible(true);
+        } else {
+            this.regContainer.setVisible(false);
+        }
     }
 
     createInputField(x, y, p, n, isP, defaultVal = '') { 
@@ -181,12 +214,11 @@ class GameScene extends Phaser.Scene {
         // 1. Background (Depth 0)
         this.add.image(width/2, height/2, 'background').setDisplaySize(width, height).setDepth(0);
 
-        // 2. Reel Frame - BIG FRAME (Depth 1 - Bottom of game elements)
+        // 2. Reel Frame - BIG FRAME (Depth 1 - Bottom)
         const frameCenterY = LAYOUT.START_Y + ((ROW_COUNT-1)*(LAYOUT.SYMBOL_HEIGHT+LAYOUT.GAP))/2;
         this.add.image(width/2, frameCenterY, 'reel_frame_img').setDisplaySize(TOTAL_GRID_WIDTH+30, (LAYOUT.SYMBOL_HEIGHT*ROW_COUNT)+40).setDepth(1); 
 
-        // 3. Golden Frame (Depth 2 - Middle)
-        // 4. Symbols (Depth 3 - Top)
+        // 3. Grid & Symbols
         const maskShape = this.make.graphics().fillStyle(0xffffff).fillRect(START_X-LAYOUT.REEL_WIDTH/2-5, LAYOUT.START_Y-LAYOUT.SYMBOL_HEIGHT/2-5, TOTAL_GRID_WIDTH+10, (LAYOUT.SYMBOL_HEIGHT*ROW_COUNT)+(LAYOUT.GAP*ROW_COUNT)+20);
         const gridMask = maskShape.createGeometryMask();
         
@@ -197,10 +229,10 @@ class GameScene extends Phaser.Scene {
                 const x = START_X + reel*(LAYOUT.REEL_WIDTH+LAYOUT.GAP); 
                 const y = LAYOUT.START_Y + row*(LAYOUT.SYMBOL_HEIGHT+LAYOUT.GAP); 
                 
-                // Golden Frame (Middle)
+                // Golden Frame (Middle - Depth 2)
                 this.add.image(x, y, 'golden_frame').setDisplaySize(LAYOUT.REEL_WIDTH, LAYOUT.SYMBOL_HEIGHT).setDepth(2); 
                 
-                // Symbol (Top)
+                // Symbol (Top - Depth 3)
                 const s = this.add.image(x, y, Phaser.Utils.Array.GetRandom(SYMBOL_KEYS)).setDisplaySize(LAYOUT.REEL_WIDTH-15, LAYOUT.SYMBOL_HEIGHT-15).setDepth(3).setMask(gridMask);
                 
                 s.originalX = x; s.originalY = y; s.rowIndex = row; 
@@ -208,18 +240,18 @@ class GameScene extends Phaser.Scene {
             }
         }
 
-        // 5. Coin Particles (Depth 4 - Over symbols)
+        // 4. Coin Rain (Depth 4)
         this.coinParticles = this.add.particles('coin');
         this.coinParticles.setDepth(4); 
 
-        // UI Layer (Depth 50+)
+        // 5. UI Layer (Depth 50+)
         this.add.text(width/2, 80, 'SuperAce', { font: 'bold 48px Arial', fill: '#FFD700', stroke: '#000', strokeThickness: 4 }).setOrigin(0.5).setDepth(50); 
         this.noticeLabel = this.add.text(width, 140, "Welcome!", { font: '20px Arial', fill: '#0F0', backgroundColor: '#000' }).setOrigin(0, 0.5).setDepth(50);
         this.tweens.add({ targets: this.noticeLabel, x: -600, duration: 12000, repeat: -1 });
         
         this.fetchSettings();
 
-        // Sound Button
+        // Sound Controls
         this.soundBtn = this.add.image(width-40, 80, 'sound_on').setDisplaySize(50, 50).setInteractive({useHandCursor:true}).setDepth(50);
         this.soundWaves = this.add.text(width-70, 80, ')))', {fontSize: '20px', fill: '#0F0'}).setOrigin(1, 0.5).setDepth(50);
         this.soundBtn.on('pointerdown', () => { 
@@ -229,6 +261,7 @@ class GameScene extends Phaser.Scene {
             this.soundWaves.setVisible(this.soundEnabled);
         });
 
+        // Multiplier UI
         const multBG = this.add.graphics();
         multBG.fillStyle(0x000000, 0.6); 
         multBG.fillRect(width/2 - 150, 160, 300, 40);
@@ -240,13 +273,13 @@ class GameScene extends Phaser.Scene {
         });
         this.updateMultiplierUI();
 
+        // Game Controls
         const uiY = height - 100; 
         this.spinButton = this.add.image(width/2, uiY, 'bet_button').setScale(0.08).setInteractive().setDepth(52);
         this.spinButton.on('pointerdown', this.startSpin, this);
         this.add.text(width/2, uiY, 'SPIN', { font: 'bold 18px Arial', fill: '#FFD700' }).setOrigin(0.5).setDepth(53);
 
         this.add.image(width-80, uiY-60, 'plus_button').setScale(0.35).setInteractive().setDepth(52).on('pointerdown', () => this.adjustBet(1));
-        // 🔥 Minus Button Bigger (0.45)
         this.add.image(width-80, uiY+60, 'minus_button').setScale(0.45).setInteractive().setDepth(52).on('pointerdown', () => this.adjustBet(-1));
         
         this.betAdjustText = this.add.text(width-80, uiY+5, `Tk ${this.currentBet}`, { fontSize: '24px', fill: '#FFF' }).setOrigin(0.5).setDepth(52);
@@ -407,34 +440,50 @@ class GameScene extends Phaser.Scene {
         return total;
     }
 
+    // --- HELPER FUNCTION: Close Active Panel ---
     closeActivePanel() {
         if(this.activePanel) {
-            if(this.activePanel.tagName) { document.body.removeChild(this.activePanel); } 
-            else { this.activePanel.destroy(); }
+            if(this.activePanel.tagName) { 
+                try { document.body.removeChild(this.activePanel); } catch(e){} 
+            } else { 
+                this.activePanel.destroy(); 
+            }
             this.activePanel = null;
         }
     }
 
+    // --- HTML SCROLL PANEL (Fixed Header) ---
     createHTMLScrollPanel(title, dataList, onClose) {
         this.closeActivePanel();
+        
         const div = document.createElement('div');
-        div.style = "position:absolute; top:50%; left:50%; transform:translate(-50%, -50%); width:350px; height:500px; background:black; border:3px solid gold; overflow-y:auto; padding:15px; color:white; font-family:arial; z-index:1000; text-align:center; border-radius:10px; box-shadow: 0 0 20px black;";
+        div.style = "position:absolute; top:50%; left:50%; transform:translate(-50%, -50%); width:350px; height:500px; background:black; border:3px solid gold; padding:15px; color:white; font-family:arial; z-index:1000; text-align:center; border-radius:10px; box-shadow: 0 0 20px black; display:flex; flex-direction:column;";
         this.activePanel = div;
+
+        // Header
         const header = document.createElement('div');
-        header.style = "display:flex; justify-content:space-between; align-items:center; border-bottom: 1px solid #555; padding-bottom:10px; margin-bottom:10px;";
+        header.style = "display:flex; justify-content:space-between; align-items:center; border-bottom: 1px solid #555; padding-bottom:10px; margin-bottom:10px; flex-shrink:0;";
+        
         const h2 = document.createElement('h3');
         h2.innerText = title;
         h2.style = "color: gold; margin:0;";
+        
         const closeBtn = document.createElement('button');
         closeBtn.innerText = " X ";
         closeBtn.style = "background:red; color:white; border:none; padding:5px 10px; font-size:20px; font-weight:bold; cursor:pointer; border-radius:5px;";
         closeBtn.onclick = () => { document.body.removeChild(div); this.activePanel = null; onClose(); };
+        
         header.appendChild(h2);
         header.appendChild(closeBtn);
         div.appendChild(header);
+
+        // Content
         const contentDiv = document.createElement('div');
-        if(dataList.length === 0) { contentDiv.innerHTML = "<p style='color:#888'>No Records Found</p>"; } 
-        else {
+        contentDiv.style = "overflow-y:auto; flex-grow:1;";
+        
+        if(dataList.length === 0) {
+            contentDiv.innerHTML = "<p style='color:#888'>No Records Found</p>";
+        } else {
             dataList.forEach(item => {
                 const p = document.createElement('div');
                 p.style = `border-bottom:1px solid #333; padding:10px; margin:0; text-align:left; color:${item.color || 'white'}`;
@@ -490,7 +539,7 @@ class GameScene extends Phaser.Scene {
             ];
             const btnHtml = `<button id="banBtn" style="width:100%; padding:10px; margin-top:10px; background:${u.isBanned?'green':'red'}; color:white; border:none; font-weight:bold; font-size:18px;">${u.isBanned?'UNBAN USER':'BAN USER'}</button>`;
             this.createHTMLScrollPanel(`USER: ${username}`, details, () => {});
-            const div = this.activePanel;
+            const div = this.activePanel.querySelector('div[style*="overflow-y"]');
             const btnContainer = document.createElement('div');
             btnContainer.innerHTML = btnHtml;
             div.appendChild(btnContainer);
@@ -525,6 +574,7 @@ class GameScene extends Phaser.Scene {
         .then(() => { alert("Action Taken"); this.showAdminRequestsPanel(type); }); 
     }
 
+    // --- SHARE PANEL UPDATE ---
     showSharePanel() {
         this.closeActivePanel();
         const code = this.currentUser.myCode || "LOADING";
@@ -542,9 +592,10 @@ class GameScene extends Phaser.Scene {
             <div style="background:#333; padding:10px; border-radius:5px; word-break:break-all; margin-bottom:10px; border:1px solid #555;">${link}</div>
             <button id="copyBtn" style="background:blue; color:white; border:none; padding:8px 15px; border-radius:5px; cursor:pointer; font-weight:bold;">COPY LINK</button>
             <br><br>
-            <div style="display:flex; justify-content:space-around;">
+            <div style="display:flex; justify-content:space-around; flex-wrap:wrap; gap:10px;">
                 <a href="whatsapp://send?text=${encodeURIComponent(msg)}" style="background:#25D366; color:white; padding:8px; text-decoration:none; border-radius:5px;">WhatsApp</a>
                 <a href="https://t.me/share/url?url=${encodeURIComponent(link)}&text=${encodeURIComponent(msg)}" style="background:#0088cc; color:white; padding:8px; text-decoration:none; border-radius:5px;">Telegram</a>
+                <a href="fb-messenger://share/?link=${encodeURIComponent(link)}" style="background:#006AFF; color:white; padding:8px; text-decoration:none; border-radius:5px;">Messenger</a>
             </div>
         `;
         document.body.appendChild(div);
@@ -681,8 +732,8 @@ class GameScene extends Phaser.Scene {
         this.addCloseButton(c, ()=>c.destroy(), 250);
         let y = -150;
         const rateTxt = this.add.text(0, y, `WIN RATE: ${this.currentWinRate}%`, {fontSize:'24px', fill:'#0F0'}).setOrigin(0.5);
-        const btnMinus = this.add.text(-120, y, " [-] ", {fontSize:'24px', backgroundColor:'#F00'}).setOrigin(0.5).setInteractive({useHandCursor:true});
-        const btnPlus = this.add.text(120, y, " [+] ", {fontSize:'24px', backgroundColor:'#0A0'}).setOrigin(0.5).setInteractive({useHandCursor:true});
+        const btnMinus = this.add.text(-150, y, " [-] ", {fontSize:'24px', backgroundColor:'#F00'}).setOrigin(0.5).setInteractive({useHandCursor:true});
+        const btnPlus = this.add.text(150, y, " [+] ", {fontSize:'24px', backgroundColor:'#0A0'}).setOrigin(0.5).setInteractive({useHandCursor:true});
         const updateRate = (n) => {
             let newRate = this.currentWinRate + n;
             if(newRate < 0) newRate = 0; if(newRate > 100) newRate = 100;
@@ -734,7 +785,7 @@ class GameScene extends Phaser.Scene {
             ];
             const btnHtml = `<button id="banBtn" style="width:100%; padding:10px; margin-top:10px; background:${u.isBanned?'green':'red'}; color:white; border:none; font-weight:bold; font-size:18px;">${u.isBanned?'UNBAN USER':'BAN USER'}</button>`;
             this.createHTMLScrollPanel(`USER: ${username}`, details, () => {});
-            const div = this.activePanel;
+            const div = this.activePanel.querySelector('div[style*="overflow-y"]');
             const btnContainer = document.createElement('div');
             btnContainer.innerHTML = btnHtml;
             div.appendChild(btnContainer);
@@ -760,17 +811,6 @@ class GameScene extends Phaser.Scene {
         const closeBtn = this.add.text(210, -230, " X ", {fontSize:'28px', backgroundColor:'red', fill:'white', padding:5}).setOrigin(0.5).setInteractive({useHandCursor:true});
         closeBtn.on('pointerdown', () => { c.destroy(); this.activePanel=null; });
         c.add([b1, hBtn, closeBtn]);
-    }
-
-    showTransactionHistory(type) {
-        fetch(`/api/user-transactions?username=${this.currentUser.username}&type=${type}`)
-        .then(r=>r.json()).then(data => {
-            const list = data.map(t => ({
-                text: `${new Date(t.date).toLocaleDateString()} | Tk ${t.amount} | ${t.status}`,
-                color: t.status === 'Success' ? '#0F0' : (t.status === 'Pending' ? '#FF0' : '#F00')
-            }));
-            this.createHTMLScrollPanel(`${type.toUpperCase()} HISTORY`, list, () => {});
-        });
     }
 
     showHistoryPanel() {
